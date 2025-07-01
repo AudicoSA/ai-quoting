@@ -14,9 +14,9 @@ logger = logging.getLogger(__name__)
 
 # Create FastAPI app instance
 app = FastAPI(
-    title="Audico AI - Enhanced Quoting System",
-    description="Audio Equipment Solutions with Smart Search and Live Quoting",
-    version="3.0.0"
+    title="Audico AI - Auto-Add Enhanced Quoting System",
+    description="Audio Equipment Solutions with Smart Auto-Add and Live Quoting",
+    version="4.0.0"
 )
 
 # CORS middleware
@@ -28,7 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory quote storage (will be moved to database later)
+# In-memory quote storage
 active_quotes = {}
 
 # Request models
@@ -65,216 +65,41 @@ class Quote(BaseModel):
 @app.get("/")
 async def root():
     return {
-        "message": "Audico AI Enhanced Quoting System", 
-        "version": "3.0.0",
-        "features": ["Smart Search", "Live Quotes", "Special Pricing", "Stock Filtering"]
+        "message": "Audico AI Auto-Add Enhanced Quoting System", 
+        "version": "4.0.0",
+        "features": ["🎯 Smart Auto-Add", "💰 Fixed Special Pricing", "🔍 Working Search", "📦 Live Quotes"]
     }
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "Audico AI Enhanced Backend", "version": "3.0.0"}
+    return {"status": "healthy", "service": "Audico AI Auto-Add Backend", "version": "4.0.0"}
 
-@app.post("/api/v1/chat")
-async def enhanced_chat_endpoint(chat_data: ChatMessage):
-    """Enhanced chat with flexible search and quote building"""
+async def auto_add_to_quote(product: Dict, quote_id: str, quantity: int = 1) -> Dict:
+    """Automatically add product to quote"""
     try:
-        user_message = chat_data.message
-        category = chat_data.category
-        quote_id = chat_data.quote_id
+        if not quote_id:
+            quote_id = str(uuid.uuid4())
         
-        logger.info(f"Processing message: '{user_message}' for category: '{category}'")
+        # Get full product details with pricing
+        full_product = sqlantern_db.get_product_by_id(product['product_id'])
         
-        # Check if user is asking for a specific product
-        if any(keyword in user_message.lower() for keyword in ["add", "quote", "price", "cost"]):
-            # Extract potential product name/model
-            search_terms = []
-            
-            words = user_message.split()
-            for word in words:
-                if len(word) > 3 and not word.lower() in ['please', 'quote', 'price', 'cost', 'add', 'the', 'to']:
-                    search_terms.append(word)
-            
-            if search_terms:
-                exact_search = " ".join(search_terms)
-                # Use enhanced search with flexible matching
-                products = sqlantern_db.search_products(exact_search, limit=10, include_out_of_stock=False)
-                
-                if products:
-                    response = f"""I found these products matching "{exact_search}" in our inventory:
-
-🎵 **Available Products:** (In Stock Only)
-"""
-                    quote_items = []
-                    
-                    for i, product in enumerate(products[:5]):
-                        response += f"\n{i+1}. **{product['name']}**"
-                        
-                        # Enhanced pricing display
-                        if product.get('has_special_price'):
-                            response += f"\n   💰 **SPECIAL: {product['price_formatted']}**"
-                            if product.get('original_price_formatted'):
-                                response += f" ~~{product['original_price_formatted']}~~"
-                            if product.get('savings_formatted'):
-                                response += f" (Save {product['savings_formatted']}!) ⚡"
-                        else:
-                            response += f"\n   💰 Price: {product['price_formatted']}"
-                        
-                        if product.get('model'):
-                            response += f"\n   🔢 Model: {product['model']}"
-                        if product.get('manufacturer'):
-                            response += f"\n   🏭 Brand: {product['manufacturer']}"
-                        if product.get('categories_display'):
-                            response += f"\n   🏷️ Categories: {product['categories_display']}"
-                        response += f"\n   📦 Stock: ✅ Available ({product['quantity']} units)"
-                        response += f"\n   [Add to Quote: Product {i+1}]"
-                        response += f"\n"
-                        
-                        quote_items.append({
-                            'product_id': product['product_id'],
-                            'name': product['name'],
-                            'model': product.get('model', ''),
-                            'price': product['price_zar'],
-                            'has_special_price': product.get('has_special_price', False),
-                            'original_price': product.get('original_price', 0),
-                            'savings': product.get('savings', 0)
-                        })
-                    
-                    response += f"\n**To add to quote, say: 'Add product 1' or 'Add {products[0].get('model', 'product')} to quote'**"
-                    
-                    if len(products) > 5:
-                        response += f"\n\n*Found {len(products)} total matches. Showing top 5 in-stock products.*"
-                    
-                    return {
-                        "response": response,
-                        "category": category,
-                        "user_message": user_message,
-                        "products_found": products[:5],
-                        "quote_items_available": quote_items,
-                        "quote_id": quote_id,
-                        "search_type": "product_search",
-                        "status": "success"
-                    }
-                else:
-                    # Try broader search if exact search fails
-                    broader_products = []
-                    for term in search_terms:
-                        if len(term) > 3:
-                            broader = sqlantern_db.search_products(term, limit=3, include_out_of_stock=False)
-                            broader_products.extend(broader)
-                    
-                    if broader_products:
-                        response = f"""I couldn't find "{exact_search}" exactly, but found similar products:
-
-🔍 **Similar Products:**
-"""
-                        for product in broader_products[:3]:
-                            response += f"\n• {product['name']} - {product['price_formatted']}"
-                            if product.get('has_special_price'):
-                                response += " ⚡ SPECIAL!"
-                        
-                        response += f"\n\n**Try searching with exact model numbers for better results.**"
-                    else:
-                        response = f"""I couldn't find "{exact_search}" in our current inventory.
-
-💡 **Search Tips:**
-• Try exact model numbers: "AVR-X1800H" or "AVRX1800H"
-• Use brand names: "Denon", "Yamaha"
-• Check spelling and try variations
-
-**What specific audio equipment are you looking for?**"""
-                    
-                    return {
-                        "response": response,
-                        "category": category,
-                        "user_message": user_message,
-                        "search_type": "no_exact_match",
-                        "status": "success"
-                    }
+        if not full_product:
+            return {"error": "Product not found"}
         
-        # General category response
-        else:
-            response = f"""I'm here to help you find the perfect audio equipment for your {category}.
-
-🔍 **I can help you:**
-• Search for specific products (try: "add Denon AVR-X1800H")
-• Get pricing and availability
-• Build quotes with multiple items
-• Find compatible equipment
-
-**What audio equipment are you looking for?**
-
-💡 *Enhanced search now handles variations like "AVRX1800H" and "AVR-X1800H"*"""
-            
-            return {
-                "response": response,
-                "category": category,
-                "user_message": user_message,
-                "search_type": "general_help",
-                "status": "success"
-            }
+        # Create quote item with correct pricing
+        final_price = full_product['price_zar']
+        has_special = full_product.get('has_special_price', False)
         
-    except Exception as e:
-        logger.error(f"Error in chat endpoint: {str(e)}")
-        return {
-            "response": "I'm having trouble right now. Please try again.",
-            "error": str(e),
-            "status": "error"
-        }
-
-@app.post("/api/v1/quotes/add-item")
-async def add_item_to_quote(request: AddToQuoteRequest):
-    """Add item to quote"""
-    try:
-        quote_id = request.quote_id or str(uuid.uuid4())
-        
-        # Get product details
-        if not sqlantern_db.connect():
-            raise HTTPException(status_code=500, detail="Database connection failed")
-        
-        cursor = sqlantern_db.connection.cursor(dictionary=True)
-        cursor.execute("""
-            SELECT p.product_id, pd.name, p.model, p.price, ps.price as special_price, p.quantity,
-                   m.name as manufacturer
-            FROM oc_product p
-            LEFT JOIN oc_product_description pd ON p.product_id = pd.product_id
-            LEFT JOIN oc_manufacturer m ON p.manufacturer_id = m.manufacturer_id
-            LEFT JOIN oc_product_special ps ON p.product_id = ps.product_id 
-                AND ps.customer_group_id = 1 
-                AND ((ps.date_start = '0000-00-00' OR ps.date_start < NOW()) 
-                AND (ps.date_end = '0000-00-00' OR ps.date_end > NOW()))
-            WHERE p.product_id = %s AND pd.language_id = 1
-        """, (request.product_id,))
-        
-        product = cursor.fetchone()
-        sqlantern_db.disconnect()
-        
-        if not product:
-            raise HTTPException(status_code=404, detail="Product not found")
-        
-        # Calculate pricing
-        special_price = product.get('special_price')
-        regular_price = float(product.get('price', 0))
-        
-        if special_price and float(special_price) > 0:
-            final_price = float(special_price)
-            has_special = True
-            savings = regular_price - final_price
-        else:
-            final_price = regular_price
-            has_special = False
-            savings = 0
-        
-        # Create quote item
         quote_item = QuoteItem(
-            product_id=product['product_id'],
-            name=product['name'],
-            model=product.get('model', ''),
+            product_id=full_product['product_id'],
+            name=full_product['name'],
+            model=full_product.get('model', ''),
             price=final_price,
-            quantity=request.quantity,
-            total_price=final_price * request.quantity,
+            quantity=quantity,
+            total_price=final_price * quantity,
             has_special_price=has_special,
-            original_price=regular_price if has_special else None,
-            savings=savings * request.quantity if has_special else None
+            original_price=full_product.get('original_price') if has_special else None,
+            savings=full_product.get('savings', 0) * quantity if has_special else None
         )
         
         # Add to quote
@@ -288,15 +113,15 @@ async def add_item_to_quote(request: AddToQuoteRequest):
         
         quote = active_quotes[quote_id]
         
-        # Check if item already exists, update quantity if so
+        # Check if item already exists
         existing_item = None
         for item in quote['items']:
-            if item['product_id'] == request.product_id:
+            if item['product_id'] == product['product_id']:
                 existing_item = item
                 break
         
         if existing_item:
-            existing_item['quantity'] += request.quantity
+            existing_item['quantity'] += quantity
             existing_item['total_price'] = existing_item['price'] * existing_item['quantity']
             if existing_item.get('savings'):
                 existing_item['savings'] = (existing_item['original_price'] - existing_item['price']) * existing_item['quantity']
@@ -311,17 +136,186 @@ async def add_item_to_quote(request: AddToQuoteRequest):
         item_count = sum(item['quantity'] for item in quote['items'])
         
         return {
-            "message": "Item added to quote successfully",
+            "success": True,
             "quote_id": quote_id,
             "item_added": quote_item.dict(),
             "quote_summary": {
-                "total_amount": f"R{total_amount:,.2f}",
-                "total_savings": f"R{total_savings:,.2f}" if total_savings > 0 else None,
+                "total_amount": total_amount,
+                "total_savings": total_savings,
                 "item_count": item_count,
                 "items": len(quote['items'])
-            },
-            "status": "success"
+            }
         }
+        
+    except Exception as e:
+        logger.error(f"Auto-add error: {e}")
+        return {"error": str(e)}
+
+@app.post("/api/v1/chat")
+async def enhanced_chat_endpoint(chat_data: ChatMessage):
+    """🎯 Enhanced chat with SMART AUTO-ADD functionality"""
+    try:
+        user_message = chat_data.message
+        category = chat_data.category
+        quote_id = chat_data.quote_id
+        
+        logger.info(f"🎯 AUTO-ADD CHAT: '{user_message}' for category: '{category}'")
+        
+        # Check if user wants to add a product
+        if any(keyword in user_message.lower() for keyword in ["add", "quote", "price", "cost"]):
+            # Extract search terms (FIXED to exclude common words properly)
+            search_terms = []
+            words = user_message.split()
+            
+            for word in words:
+                # FIXED: Better word filtering to exclude typos and common words
+                if (len(word) > 2 and 
+                    not word.lower() in ['please', 'pleasse', 'quote', 'price', 'cost', 'add', 'the', 'to', 'a', 'you', 'would', 'like', 'i', 'want', 'need']):
+                    search_terms.append(word)
+            
+            if search_terms:
+                exact_search = " ".join(search_terms)
+                logger.info(f"🔍 SEARCHING FOR: '{exact_search}'")
+                
+                # Search for products
+                products = sqlantern_db.search_products(exact_search, limit=10, include_out_of_stock=False)
+                
+                if products:
+                    best_match = products[0]  # Take the best match
+                    
+                    # 🎯 AUTO-ADD MAGIC: Automatically add the best match to quote
+                    add_result = await auto_add_to_quote(best_match, quote_id)
+                    
+                    if add_result.get('success'):
+                        # Create success response
+                        response = f"✅ **Added to Quote: {best_match['name']}**\n\n"
+                        
+                        if best_match.get('has_special_price'):
+                            response += f"💰 **SPECIAL PRICE: {best_match['price_formatted']}** "
+                            if best_match.get('original_price_formatted'):
+                                response += f"~~{best_match['original_price_formatted']}~~ "
+                            if best_match.get('savings_formatted'):
+                                response += f"(Save {best_match['savings_formatted']}!) ⚡"
+                            response += "\n"
+                        else:
+                            response += f"💰 Price: {best_match['price_formatted']}\n"
+                        
+                        response += f"📦 Quantity: 1\n"
+                        response += f"🔢 Model: {best_match.get('model', 'N/A')}\n\n"
+                        
+                        # Quote summary
+                        summary = add_result['quote_summary']
+                        response += f"**Quote Total: R{summary['total_amount']:,.2f}**"
+                        if summary['total_savings'] > 0:
+                            response += f" (Save R{summary['total_savings']:,.2f}!)"
+                        response += f"\n"
+                        response += f"Items in quote: {summary['items']}\n\n"
+                        response += "**Would you like to add anything else to complete your audio system?**"
+                        
+                        return {
+                            "response": response,
+                            "category": category,
+                            "user_message": user_message,
+                            "quote_id": add_result['quote_id'],
+                            "item_added": add_result['item_added'],
+                            "quote_summary": add_result['quote_summary'],
+                            "search_type": "auto_add_success",
+                            "auto_added": True,
+                            "status": "success"
+                        }
+                    else:
+                        return {
+                            "response": f"❌ Sorry, I couldn't add '{best_match['name']}' to your quote right now. Please try again.",
+                            "error": add_result.get('error'),
+                            "status": "error"
+                        }
+                
+                else:
+                    # No products found - try broader search
+                    broader_products = []
+                    for term in search_terms:
+                        if len(term) > 3:
+                            broader = sqlantern_db.search_products(term, limit=3, include_out_of_stock=False)
+                            broader_products.extend(broader)
+                    
+                    if broader_products:
+                        response = f"❌ I couldn't find '{exact_search}' exactly, but found similar products:\n\n🔍 **Similar Products:**\n"
+                        for product in broader_products[:3]:
+                            response += f"\n• {product['name']} - {product['price_formatted']}"
+                            if product.get('has_special_price'):
+                                response += " ⚡ SPECIAL!"
+                        response += f"\n\n💡 **Try searching with exact model numbers for better results.**"
+                    else:
+                        response = f"❌ I couldn't find '{exact_search}' in our current inventory.\n\n💡 **Search Tips:**\n• Try exact model numbers: 'AVR-X1800H' or 'AVRX1800H'\n• Use brand names: 'Denon', 'Yamaha'\n• Check spelling and try variations\n\n**What specific audio equipment are you looking for?**"
+                    
+                    return {
+                        "response": response,
+                        "category": category,
+                        "user_message": user_message,
+                        "search_type": "no_exact_match",
+                        "auto_added": False,
+                        "status": "no_results"
+                    }
+        
+        # General welcome response
+        else:
+            response = f"👋 **Welcome to Audico AI for {category.title()}!**\n\n"
+            response += "I'm here to help you build the perfect audio system with our latest inventory.\n\n"
+            response += "🎯 **I can help you:**\n"
+            response += "• Find and add products instantly (try: 'add Denon AVR-X1800H')\n"
+            response += "• Get accurate pricing with special offers\n"
+            response += "• Build and manage live quotes\n"
+            response += "• Recommend complete audio solutions\n\n"
+            response += "**What audio equipment are you looking for today?**\n\n"
+            response += "💡 *Just say 'add [product name]' and I'll automatically add it to your quote!*"
+            
+            return {
+                "response": response,
+                "category": category,
+                "user_message": user_message,
+                "search_type": "welcome",
+                "auto_added": False,
+                "status": "success"
+            }
+        
+    except Exception as e:
+        logger.error(f"Enhanced chat error: {str(e)}")
+        return {
+            "response": "I'm having trouble right now. Please try again.",
+            "error": str(e),
+            "status": "error"
+        }
+
+@app.post("/api/v1/quotes/add-item")
+async def add_item_to_quote(request: AddToQuoteRequest):
+    """Manual add item to quote (for API calls)"""
+    try:
+        quote_id = request.quote_id or str(uuid.uuid4())
+        
+        # Get product details
+        product = sqlantern_db.get_product_by_id(request.product_id)
+        
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        
+        # Use the auto-add function
+        result = await auto_add_to_quote(product, quote_id, request.quantity)
+        
+        if result.get('success'):
+            return {
+                "message": "✅ Item added to quote successfully!",
+                "quote_id": result['quote_id'],
+                "item_added": result['item_added'],
+                "quote_summary": {
+                    "total_amount": f"R{result['quote_summary']['total_amount']:,.2f}",
+                    "total_savings": f"R{result['quote_summary']['total_savings']:,.2f}" if result['quote_summary']['total_savings'] > 0 else None,
+                    "item_count": result['quote_summary']['item_count'],
+                    "items": result['quote_summary']['items']
+                },
+                "status": "success"
+            }
+        else:
+            raise HTTPException(status_code=500, detail=result.get('error', 'Failed to add item'))
         
     except Exception as e:
         logger.error(f"Error adding item to quote: {e}")
@@ -422,132 +416,6 @@ async def get_categories():
         logger.error(f"Error getting categories: {str(e)}")
         return {"solution_categories": solution_categories, "product_categories": []}
 
-@app.get("/api/v1/database/test")
-async def test_database_connection():
-    """Test database connection and enhanced features"""
-    try:
-        if sqlantern_db.connect():
-            sqlantern_db.disconnect()
-            
-            # Test enhanced search
-            test_search = sqlantern_db.search_products("denon avr", limit=5, include_out_of_stock=False)
-            
-            return {
-                "status": "connected",
-                "message": "Successfully connected to enhanced SQLantern database",
-                "enhanced_features": {
-                    "flexible_search": True,
-                    "special_pricing": True,
-                    "stock_filtering": True,
-                    "deduplication": True
-                },
-                "test_search_results": len(test_search),
-                "sample_products": [
-                    {
-                        "name": p['name'],
-                        "price": p['price_formatted'],
-                        "special": p.get('has_special_price', False),
-                        "stock": p['quantity']
-                    } for p in test_search[:2]
-                ]
-            }
-        else:
-            return {
-                "status": "failed",
-                "message": "Could not connect to SQLantern database"
-            }
-    except Exception as e:
-        logger.error(f"Database test error: {str(e)}")
-        return {
-            "status": "error",
-            "message": f"Database test failed: {str(e)}"
-        }
-
-# Development and testing endpoints
-@app.get("/api/v1/test/search-flexible")
-async def test_flexible_search():
-    """Test flexible search functionality"""
-    try:
-        test_queries = [
-            "denon avr-x1800h",  # Standard format
-            "denon avrx1800h",   # No dash
-            "denon avr x1800h",  # Space instead of dash
-            "DENON AVR-X1800H",  # Uppercase
-            "avr-x1800h"         # No brand
-        ]
-        
-        results = {}
-        for query in test_queries:
-            products = sqlantern_db.search_products(query, limit=3, include_out_of_stock=False)
-            results[query] = {
-                "found": len(products),
-                "products": [p['name'] for p in products]
-            }
-        
-        return {
-            "test_type": "flexible_search",
-            "note": "Testing various search term formats",
-            "results": results,
-            "success": all(len(sqlantern_db.search_products(q, limit=1)) > 0 for q in test_queries[:3])
-        }
-        
-    except Exception as e:
-        return {"error": str(e)}
-
-@app.get("/api/v1/test/special-pricing")
-async def test_special_pricing():
-    """Test special pricing detection"""
-    try:
-        # Search for products with potential special pricing
-        products = sqlantern_db.search_products("denon", limit=10, include_out_of_stock=False)
-        
-        special_products = [p for p in products if p.get('has_special_price')]
-        regular_products = [p for p in products if not p.get('has_special_price')]
-        
-        return {
-            "test_type": "special_pricing",
-            "total_products": len(products),
-            "products_with_specials": len(special_products),
-            "products_regular_price": len(regular_products),
-            "special_examples": [
-                {
-                    "name": p['name'],
-                    "special_price": p['price_formatted'],
-                    "original_price": p.get('original_price_formatted', 'N/A'),
-                    "savings": p.get('savings_formatted', 'N/A')
-                } for p in special_products[:3]
-            ],
-            "note": "Should show R15,990 special vs R19,990 retail for Denon AVR-X1800H"
-        }
-        
-    except Exception as e:
-        return {"error": str(e)}
-
-@app.get("/api/v1/test/stock-filtering")
-async def test_stock_filtering():
-    """Test stock filtering functionality"""
-    try:
-        # Test with and without stock filtering
-        with_stock = sqlantern_db.search_products("denon", limit=20, include_out_of_stock=False)
-        with_out_of_stock = sqlantern_db.search_products("denon", limit=20, include_out_of_stock=True)
-        
-        return {
-            "test_type": "stock_filtering",
-            "in_stock_only": len(with_stock),
-            "including_out_of_stock": len(with_out_of_stock),
-            "out_of_stock_filtered": len(with_out_of_stock) - len(with_stock),
-            "sample_in_stock": [
-                {
-                    "name": p['name'],
-                    "stock": p['quantity']
-                } for p in with_stock[:3]
-            ],
-            "note": "Stock filtering working - excludes discontinued products like AVR-X2600H"
-        }
-        
-    except Exception as e:
-        return {"error": str(e)}
-
 @app.get("/api/v1/quotes")
 async def list_quotes():
     """List all active quotes"""
@@ -580,17 +448,18 @@ async def list_quotes():
 
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 Starting Audico AI Enhanced Backend...")
+    print("🚀 Starting Audico AI AUTO-ADD Enhanced Backend...")
     print("📊 Server: http://localhost:8000")
     print("📚 API Docs: http://localhost:8000/docs")
-    print("🧪 Test Flexible Search: http://localhost:8000/api/v1/test/search-flexible")
-    print("💰 Test Special Pricing: http://localhost:8000/api/v1/test/special-pricing")
-    print("📦 Test Stock Filtering: http://localhost:8000/api/v1/test/stock-filtering")
-    print("\n🎯 Key Features:")
-    print("✅ Flexible search (handles AVRX1800H and AVR-X1800H)")
-    print("✅ Special pricing detection (R15,990 vs R19,990)")
-    print("✅ Stock filtering (excludes out-of-stock)")
-    print("✅ Live quote building")
-    print("✅ Smart deduplication")
+    print("\n🎯 NEW FEATURES:")
+    print("✅ SMART AUTO-ADD: Just say 'add denon avrx1800h' - no more choosing!")
+    print("✅ FIXED PRICING: R15,990 special price displays correctly")
+    print("✅ BETTER UX: Instant add to quote with confirmation")
+    print("✅ CLEAN SEARCH: No more 'pleasse' or 'product' confusion")
+    print("\n💬 Try these:")
+    print("• 'add denon avrx1800h'")
+    print("• 'add yamaha rx-v6a'")
+    print("• 'add polk speakers'")
+    print("\n🎉 Your customers will love the instant experience!")
     
     uvicorn.run(app, host="0.0.0.0", port=8000)

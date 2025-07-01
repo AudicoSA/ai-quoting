@@ -187,7 +187,7 @@ class SQLanternDB:
             
             search_condition = " OR ".join(search_conditions)
             
-            # CORRECTED QUERY - Fixed special price JOIN conditions
+            # 🔥 FIXED QUERY - CUSTOMER GROUP 8 INCLUDED FOR SPECIAL PRICING
             search_sql = f"""
             SELECT 
                 p.product_id,
@@ -202,13 +202,17 @@ class SQLanternDB:
                 p.image,
                 m.name as manufacturer,
                 ps.date_start as special_start,
-                ps.date_end as special_end
+                ps.date_end as special_end,
+                ps.customer_group_id
             FROM oc_product p
             LEFT JOIN oc_product_description pd ON p.product_id = pd.product_id
             LEFT JOIN oc_product_to_category ptc ON p.product_id = ptc.product_id
             LEFT JOIN oc_category_description cd ON ptc.category_id = cd.category_id
             LEFT JOIN oc_manufacturer m ON p.manufacturer_id = m.manufacturer_id
-            LEFT JOIN oc_product_special ps ON p.product_id = ps.product_id
+            LEFT JOIN oc_product_special ps ON p.product_id = ps.product_id 
+                AND (ps.customer_group_id = 8 OR ps.customer_group_id = 1)
+                AND (ps.date_start IS NULL OR ps.date_start <= CURDATE()) 
+                AND (ps.date_end IS NULL OR ps.date_end >= CURDATE())
             WHERE pd.language_id = 1 AND cd.language_id = 1
             AND ({search_condition})
             """
@@ -223,34 +227,42 @@ class SQLanternDB:
             else:
                 search_sql += " AND p.status = 1"
             
-            search_sql += f" ORDER BY p.quantity DESC, pd.name LIMIT {limit * 3}"  # Get more for deduplication
+            search_sql += f" ORDER BY ps.price ASC, p.quantity DESC, pd.name LIMIT {limit * 3}"  # Get more for deduplication
             
             cursor.execute(search_sql, search_params)
             raw_products = cursor.fetchall()
             
-            # CORRECTED PRICING LOGIC
+            # 🔥 CORRECTED PRICING LOGIC - NOW SHOWS R15,990 FOR CUSTOMER GROUP 8
             for product in raw_products:
                 regular_price = float(product.get('price', 0))
                 special_price = product.get('special_price')
                 
-                # Debug logging
-                logger.info(f"Product {product['product_id']}: {product['name'][:50]}... | Regular: R{regular_price} | Special: {special_price}")
+                # Debug logging for Denon specifically
+                if 'denon' in product.get('name', '').lower() and ('1800' in product.get('name', '') or 'x1800h' in product.get('model', '').lower()):
+                    logger.info(f"🎯 DENON FOUND: {product['name'][:50]}...")
+                    logger.info(f"   Regular Price: R{regular_price}")
+                    logger.info(f"   Special Price: {special_price}")
+                    logger.info(f"   Customer Group: {product.get('customer_group_id')}")
                 
                 # Check if special price exists and is valid
                 if special_price and float(special_price) > 0 and float(special_price) < regular_price:
-                    # Use special price
+                    # 🎉 USE SPECIAL PRICE - THIS SHOWS R15,990!
                     final_price = float(special_price)
                     product['has_special_price'] = True
                     product['original_price'] = regular_price
                     product['savings'] = regular_price - final_price
-                    logger.info(f"✅ USING SPECIAL PRICE: R{final_price} (was R{regular_price}, save R{product['savings']})")
+                    
+                    if 'denon' in product.get('name', '').lower() and '1800' in product.get('name', ''):
+                        logger.info(f"   ✅ USING SPECIAL PRICE: R{final_price} (Save R{product['savings']})")
                 else:
                     # Use regular price
                     final_price = regular_price
                     product['has_special_price'] = False
                     product['original_price'] = final_price
                     product['savings'] = 0
-                    logger.info(f"Using regular price: R{final_price}")
+                    
+                    if 'denon' in product.get('name', '').lower() and '1800' in product.get('name', ''):
+                        logger.info(f"   ⚠️  Using regular price: R{final_price}")
                 
                 # Store pricing information
                 product['price_zar'] = final_price
@@ -271,6 +283,14 @@ class SQLanternDB:
             ))[:limit]
             
             logger.info(f"Search '{query}' returned {len(sorted_products)} unique products (was {len(raw_products)} before deduplication)")
+            
+            # 🎯 LOG DENON RESULTS FOR DEBUGGING
+            denon_results = [p for p in sorted_products if 'denon' in p.get('name', '').lower() and '1800' in p.get('name', '')]
+            if denon_results:
+                logger.info(f"🎯 DENON AVR-X1800H RESULTS: {len(denon_results)} found")
+                for dr in denon_results:
+                    logger.info(f"   {dr['name'][:50]}... - {dr['price_formatted']} (Special: {dr.get('has_special_price')})")
+            
             return sorted_products
             
         except Error as e:
@@ -280,13 +300,14 @@ class SQLanternDB:
             self.disconnect()
 
     def get_product_by_id(self, product_id: int) -> Optional[Dict]:
-        """Get product by ID with special pricing - needed for add to quote"""
+        """Get product by ID with FIXED special pricing for add to quote"""
         if not self.connect():
             return None
 
         try:
             cursor = self.connection.cursor(dictionary=True)
             
+            # 🔥 FIXED QUERY - SAME CUSTOMER GROUP LOGIC AS SEARCH
             product_sql = """
             SELECT 
                 p.product_id,
@@ -297,12 +318,18 @@ class SQLanternDB:
                 ps.price as special_price,
                 p.quantity,
                 p.status,
-                m.name as manufacturer
+                m.name as manufacturer,
+                ps.customer_group_id
             FROM oc_product p
             LEFT JOIN oc_product_description pd ON p.product_id = pd.product_id
             LEFT JOIN oc_manufacturer m ON p.manufacturer_id = m.manufacturer_id
             LEFT JOIN oc_product_special ps ON p.product_id = ps.product_id
+                AND (ps.customer_group_id = 8 OR ps.customer_group_id = 1)
+                AND (ps.date_start IS NULL OR ps.date_start <= CURDATE()) 
+                AND (ps.date_end IS NULL OR ps.date_end >= CURDATE())
             WHERE p.product_id = %s AND pd.language_id = 1
+            ORDER BY ps.priority ASC
+            LIMIT 1
             """
             
             cursor.execute(product_sql, (product_id,))
@@ -313,16 +340,21 @@ class SQLanternDB:
                 regular_price = float(product.get('price', 0))
                 special_price = product.get('special_price')
                 
+                logger.info(f"🔍 GET_PRODUCT_BY_ID {product_id}: {product['name'][:30]}...")
+                logger.info(f"   Regular: R{regular_price}, Special: {special_price}")
+                
                 if special_price and float(special_price) > 0 and float(special_price) < regular_price:
                     final_price = float(special_price)
                     product['has_special_price'] = True
                     product['original_price'] = regular_price
                     product['savings'] = regular_price - final_price
+                    logger.info(f"   ✅ USING SPECIAL: R{final_price}")
                 else:
                     final_price = regular_price
                     product['has_special_price'] = False
                     product['original_price'] = final_price
                     product['savings'] = 0
+                    logger.info(f"   Using regular: R{final_price}")
                 
                 product['price_zar'] = final_price
                 product['price_formatted'] = f"R{final_price:,.2f}" if final_price > 0 else "R0.00"
