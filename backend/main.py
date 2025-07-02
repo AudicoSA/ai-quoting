@@ -538,7 +538,9 @@ async def upload_training_document_with_config(file: UploadFile = File(...), con
             result = await process_excel_with_pricing_config(file, pricing_config)
         else:
             # Fall back to regular processing
-            result = await ai_training_engine.document_intelligence.process_document(file)
+            from ai_training_engine import PricingConfig
+            default_config = PricingConfig()
+            result = await ai_training_engine.document_intelligence.process_document_with_config(file, default_config)
         
         # Update AI knowledge with enhanced data
         if ai_training_engine.audio_consultant_ai and result.get('categories'):
