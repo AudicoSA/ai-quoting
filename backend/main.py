@@ -1,5 +1,12 @@
-# Create the enhanced main.py with AI training capabilities
-enhanced_code = '''from fastapi import FastAPI, HTTPException, File, UploadFile
+# Load environment variables first - MUST be at the top
+from dotenv import load_dotenv
+import os
+
+# Load .env file
+load_dotenv()
+
+# Now import everything else
+from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import json
@@ -9,9 +16,14 @@ import logging
 from datetime import datetime
 import uuid
 
-# Add these imports at the top
-from ai_training_engine import initialize_ai_training, document_intelligence, audio_consultant_ai
-import os
+# AI training imports (with error handling)
+try:
+    from ai_training_engine import initialize_ai_training, document_intelligence, audio_consultant_ai
+except ImportError:
+    initialize_ai_training = None
+    document_intelligence = None
+    audio_consultant_ai = None
+    print("⚠️ AI training engine not available - continuing without AI features")
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -33,16 +45,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Add after app initialization
+# Initialize AI training on startup
 @app.on_event("startup")
 async def startup_event():
     """Initialize AI training on startup"""
     openai_api_key = os.getenv("OPENAI_API_KEY")
-    if openai_api_key:
-        initialize_ai_training(openai_api_key)
-        logger.info("🧠 AI Training System initialized")
+    if openai_api_key and initialize_ai_training:
+        try:
+            initialize_ai_training(openai_api_key)
+            logger.info("🧠 AI Training System initialized successfully")
+        except Exception as e:
+            logger.error(f"AI Training initialization failed: {e}")
     else:
-        logger.warning("⚠️ OPENAI_API_KEY not set - AI training disabled")
+        if not openai_api_key:
+            logger.warning("⚠️ OPENAI_API_KEY not set - AI training disabled")
+        if not initialize_ai_training:
+            logger.warning("⚠️ AI training engine not available")
 
 # In-memory quote storage
 active_quotes = {}
@@ -167,7 +185,6 @@ async def auto_add_to_quote(product: Dict, quote_id: str, quantity: int = 1) -> 
         logger.error(f"Auto-add error: {e}")
         return {"error": str(e)}
 
-# Replace your chat endpoint with this enhanced version
 @app.post("/api/v1/chat")
 async def enhanced_ai_chat_endpoint(chat_data: ChatMessage):
     """🧠 ENHANCED AI CHAT with training knowledge"""
@@ -180,7 +197,7 @@ async def enhanced_ai_chat_endpoint(chat_data: ChatMessage):
         
         # Check if user wants to add a product
         if any(keyword in user_message.lower() for keyword in ["add", "quote", "price", "cost"]):
-            # Your existing search and auto-add logic here...
+            # Extract search terms
             search_terms = []
             words = user_message.split()
             
@@ -198,14 +215,21 @@ async def enhanced_ai_chat_endpoint(chat_data: ChatMessage):
                     add_result = await auto_add_to_quote(best_match, quote_id)
                     
                     if add_result.get('success'):
-                        # 🧠 ENHANCED: Use AI for professional response
+                        # 🧠 ENHANCED: Use AI for professional response if available
                         if audio_consultant_ai:
-                            response = await audio_consultant_ai.generate_professional_response(
-                                user_message, products, {"quote_added": True}, category
-                            )
+                            try:
+                                response = await audio_consultant_ai.generate_professional_response(
+                                    user_message, products, {"quote_added": True}, category
+                                )
+                            except Exception as e:
+                                logger.error(f"AI response generation failed: {e}")
+                                response = None
                         else:
-                            # Fallback to original response
-                            response = f"✅ **Added to Quote: {best_match['name']}**\\n\\n"
+                            response = None
+                        
+                        # Fallback to original response if AI not available
+                        if not response:
+                            response = f"✅ **Added to Quote: {best_match['name']}**\n\n"
                             
                             if best_match.get('has_special_price'):
                                 response += f"💰 **SPECIAL PRICE: {best_match['price_formatted']}** "
@@ -213,20 +237,20 @@ async def enhanced_ai_chat_endpoint(chat_data: ChatMessage):
                                     response += f"~~{best_match['original_price_formatted']}~~ "
                                 if best_match.get('savings_formatted'):
                                     response += f"(Save {best_match['savings_formatted']}!) ⚡"
-                                response += "\\n"
+                                response += "\n"
                             else:
-                                response += f"💰 Price: {best_match['price_formatted']}\\n"
+                                response += f"💰 Price: {best_match['price_formatted']}\n"
                             
-                            response += f"📦 Quantity: 1\\n"
-                            response += f"🔢 Model: {best_match.get('model', 'N/A')}\\n\\n"
+                            response += f"📦 Quantity: 1\n"
+                            response += f"🔢 Model: {best_match.get('model', 'N/A')}\n\n"
                             
                             # Quote summary
                             summary = add_result['quote_summary']
                             response += f"**Quote Total: R{summary['total_amount']:,.2f}**"
                             if summary['total_savings'] > 0:
                                 response += f" (Save R{summary['total_savings']:,.2f}!)"
-                            response += f"\\n"
-                            response += f"Items in quote: {summary['items']}\\n\\n"
+                            response += f"\n"
+                            response += f"Items in quote: {summary['items']}\n\n"
                             response += "**Would you like to add anything else to complete your audio system?**"
                         
                         return {
@@ -256,14 +280,14 @@ async def enhanced_ai_chat_endpoint(chat_data: ChatMessage):
                             broader_products.extend(broader)
                     
                     if broader_products:
-                        response = f"❌ I couldn't find '{exact_search}' exactly, but found similar products:\\n\\n🔍 **Similar Products:**\\n"
+                        response = f"❌ I couldn't find '{exact_search}' exactly, but found similar products:\n\n🔍 **Similar Products:**\n"
                         for product in broader_products[:3]:
-                            response += f"\\n• {product['name']} - {product['price_formatted']}"
+                            response += f"\n• {product['name']} - {product['price_formatted']}"
                             if product.get('has_special_price'):
                                 response += " ⚡ SPECIAL!"
-                        response += f"\\n\\n💡 **Try searching with exact model numbers for better results.**"
+                        response += f"\n\n💡 **Try searching with exact model numbers for better results.**"
                     else:
-                        response = f"❌ I couldn't find '{exact_search}' in our current inventory.\\n\\n💡 **Search Tips:**\\n• Try exact model numbers: 'AVR-X1800H' or 'AVRX1800H'\\n• Use brand names: 'Denon', 'Yamaha'\\n• Check spelling and try variations\\n\\n**What specific audio equipment are you looking for?**"
+                        response = f"❌ I couldn't find '{exact_search}' in our current inventory.\n\n💡 **Search Tips:**\n• Try exact model numbers: 'AVR-X1800H' or 'AVRX1800H'\n• Use brand names: 'Denon', 'Yamaha'\n• Check spelling and try variations\n\n**What specific audio equipment are you looking for?**"
                     
                     return {
                         "response": response,
@@ -274,22 +298,27 @@ async def enhanced_ai_chat_endpoint(chat_data: ChatMessage):
                         "status": "no_results"
                     }
         
-        # 🧠 ENHANCED: General queries use AI consultant
+        # 🧠 ENHANCED: General queries use AI consultant if available
         else:
+            response = None
             if audio_consultant_ai:
-                response = await audio_consultant_ai.generate_professional_response(
-                    user_message, [], {}, category
-                )
-            else:
-                # Your existing fallback response
-                response = f"👋 **Welcome to Audico AI for {category.title()}!**\\n\\n"
-                response += "I'm here to help you build the perfect audio system with our latest inventory.\\n\\n"
-                response += "🎯 **I can help you:**\\n"
-                response += "• Find and add products instantly (try: 'add Denon AVR-X1800H')\\n"
-                response += "• Get accurate pricing with special offers\\n"
-                response += "• Build and manage live quotes\\n"
-                response += "• Recommend complete audio solutions\\n\\n"
-                response += "**What audio equipment are you looking for today?**\\n\\n"
+                try:
+                    response = await audio_consultant_ai.generate_professional_response(
+                        user_message, [], {}, category
+                    )
+                except Exception as e:
+                    logger.error(f"AI response generation failed: {e}")
+            
+            # Fallback to original response if AI not available
+            if not response:
+                response = f"👋 **Welcome to Audico AI for {category.title()}!**\n\n"
+                response += "I'm here to help you build the perfect audio system with our latest inventory.\n\n"
+                response += "🎯 **I can help you:**\n"
+                response += "• Find and add products instantly (try: 'add Denon AVR-X1800H')\n"
+                response += "• Get accurate pricing with special offers\n"
+                response += "• Build and manage live quotes\n"
+                response += "• Recommend complete audio solutions\n\n"
+                response += "**What audio equipment are you looking for today?**\n\n"
                 response += "💡 *Just say 'add [product name]' and I'll automatically add it to your quote!*"
             
             return {
@@ -512,33 +541,19 @@ if __name__ == "__main__":
     print("🚀 Starting Audico AI AUTO-ADD Enhanced Backend with AI Training...")
     print("📊 Server: http://localhost:8000")
     print("📚 API Docs: http://localhost:8000/docs")
-    print("\\n🎯 FEATURES:")
+    print("\n🎯 FEATURES:")
     print("✅ SMART AUTO-ADD: Just say 'add denon avrx1800h' - no more choosing!")
     print("✅ FIXED PRICING: R15,990 special price displays correctly")
     print("✅ BETTER UX: Instant add to quote with confirmation")
     print("✅ CLEAN SEARCH: No more 'pleasse' or 'product' confusion")
     print("🧠 AI TRAINING: Upload documents and enhance AI responses")
-    print("\\n💬 Try these:")
+    print("\n💬 Try these:")
     print("• 'add denon avrx1800h'")
     print("• 'add yamaha rx-v6a'")
     print("• 'add polk speakers'")
-    print("\\n🧠 AI Training Endpoints:")
+    print("\n🧠 AI Training Endpoints:")
     print("• POST /api/v1/training/upload-document")
     print("• GET /api/v1/training/knowledge-base")
-    print("\\n🎉 Your customers will love the AI-enhanced experience!")
+    print("\n🎉 Your customers will love the AI-enhanced experience!")
     
     uvicorn.run(app, host="0.0.0.0", port=8000)
-'''
-
-# Write the enhanced code to a file
-with open('enhanced_main.py', 'w') as f:
-    f.write(enhanced_code)
-
-print("✅ Enhanced main.py created with AI training capabilities!")
-print("\\n🧠 New AI Features Added:")
-print("• AI Training System initialization on startup")
-print("• Enhanced chat endpoint with AI-powered responses")
-print("• Document upload endpoint for training")
-print("• Knowledge base retrieval endpoint")
-print("• Professional AI response generation")
-print("\\n📁 File saved as: enhanced_main.py")
