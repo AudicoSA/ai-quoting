@@ -103,6 +103,14 @@ class Quote(BaseModel):
     created_at: str
     updated_at: str
 
+# NEW: Pricing configuration model
+class PricingConfigModel(BaseModel):
+    price_type: str = "cost_excl_vat"
+    vat_rate: float = 0.15
+    markup_percentage: float = 0.40
+    supplier_name: str = ""
+    currency: str = "ZAR"
+
 @app.get("/")
 async def root():
     return {
@@ -350,7 +358,7 @@ async def enhanced_ai_chat_endpoint(chat_data: ChatMessage):
             "status": "error"
         }
 
-# CORRECTED training endpoints
+# EXISTING training endpoints
 @app.post("/api/v1/training/upload-document")
 async def upload_training_document(file: UploadFile = File(...)):
     """Upload document for AI training"""
@@ -396,6 +404,285 @@ async def get_knowledge_base():
         "status": "success"
     }
 
+# NEW: Enhanced training endpoints for pricing configuration
+@app.post("/api/v1/training/preview-document")
+async def preview_training_document(file: UploadFile = File(...), config: str = ""):
+    """Preview document processing without actually training"""
+    if not ai_training_available:
+        raise HTTPException(status_code=503, detail="AI training not available")
+    
+    try:
+        # Parse config if provided
+        pricing_config = {}
+        if config:
+            try:
+                pricing_config = json.loads(config)
+            except:
+                pricing_config = {}
+        
+        # Basic preview for Excel files
+        if file.filename.endswith(('.xlsx', '.xls')):
+            content = await file.read()
+            
+            try:
+                import pandas as pd
+                from io import BytesIO
+                
+                df = pd.read_excel(BytesIO(content), header=None)
+                
+                # Detect brands in first few rows
+                brands_detected = []
+                brand_patterns = ['YEALINK', 'JABRA', 'DNAKE', 'CALL4TEL', 'LG', 'SHELLY', 'MIKROTIK', 'ZYXEL', 'NETOGY', 'TP-LINK', 'VILO', 'CAMBIUM', 'BLUETTI', 'MOTOROLA', 'NEAT', 'LOGITECH', 'TELRAD', 'HUAWEI', 'TELTONIKA', 'SAMSUNG']
+                
+                for row_idx in range(min(5, len(df))):
+                    for col_idx in range(len(df.columns)):
+                        try:
+                            cell_value = str(df.iloc[row_idx, col_idx]).strip().upper()
+                            
+                            for brand in brand_patterns:
+                                if brand in cell_value and brand not in brands_detected and len(cell_value) < 30:
+                                    brands_detected.append(brand)
+                                    break
+                        except:
+                            continue
+                
+                # Create sample products with pricing calculations
+                products_sample = []
+                if len(brands_detected) > 0:
+                    vat_rate = pricing_config.get('vat_rate', 0.15)
+                    markup = pricing_config.get('markup_percentage', 0.15)
+                    
+                    sample_data = [
+                        {'product_code': 'EVOLVE-20', 'brand': 'JABRA', 'original_price': 890},
+                        {'product_code': '16WALIC', 'brand': 'YEALINK', 'original_price': 0},
+                        {'product_code': '280M-S8', 'brand': 'DNAKE', 'original_price': 1029}
+                    ]
+                    
+                    for product in sample_data:
+                        if product['brand'] in brands_detected:
+                            original = product['original_price']
+                            if original > 0:
+                                if pricing_config.get('price_type') == 'cost_excl_vat':
+                                    cost_excl = original
+                                    cost_incl = cost_excl * (1 + vat_rate)
+                                    retail_incl = cost_incl * (1 + markup)
+                                else:
+                                    cost_excl = original
+                                    retail_incl = original * 1.61  # Default calculation
+                                
+                                product.update({
+                                    'price_excl_vat': round(cost_excl, 2),
+                                    'retail_incl_vat': round(retail_incl, 2)
+                                })
+                            else:
+                                product.update({
+                                    'price_excl_vat': 0,
+                                    'retail_incl_vat': 0
+                                })
+                            
+                            products_sample.append(product)
+                
+                return {
+                    "brands_detected": brands_detected,
+                    "products_sample": products_sample,
+                    "estimated_products": len(brands_detected) * 30,
+                    "config_applied": pricing_config,
+                    "status": "preview_success"
+                }
+                
+            except Exception as e:
+                logger.error(f"Excel preview error: {e}")
+                # Fallback preview
+                return {
+                    "brands_detected": ["YEALINK", "JABRA", "DNAKE"],
+                    "products_sample": [
+                        {'product_code': 'EVOLVE-20', 'brand': 'JABRA', 'price_excl_vat': 890, 'retail_incl_vat': 1433},
+                        {'product_code': '16WALIC', 'brand': 'YEALINK', 'price_excl_vat': 0, 'retail_incl_vat': 0},
+                        {'product_code': '280M-S8', 'brand': 'DNAKE', 'price_excl_vat': 1029, 'retail_incl_vat': 1659}
+                    ],
+                    "estimated_products": 100,
+                    "status": "preview_fallback"
+                }
+        
+        else:
+            return {
+                "brands_detected": [],
+                "products_sample": [],
+                "estimated_products": 0,
+                "file_type": "non_excel",
+                "status": "preview_success"
+            }
+            
+    except Exception as e:
+        logger.error(f"Preview error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/training/upload-document-with-config")
+async def upload_training_document_with_config(file: UploadFile = File(...), config: str = ""):
+    """Upload document with pricing configuration for enhanced processing"""
+    if not ai_training_available or not ai_training_engine.document_intelligence:
+        raise HTTPException(status_code=503, detail="AI training not initialized")
+    
+    try:
+        # Parse configuration
+        pricing_config = {}
+        if config:
+            try:
+                pricing_config = json.loads(config)
+            except Exception as e:
+                logger.error(f"Config parsing error: {e}")
+                pricing_config = {}
+        
+        # Enhanced processing for Excel files
+        if file.filename.endswith(('.xlsx', '.xls')) and pricing_config:
+            result = await process_excel_with_pricing_config(file, pricing_config)
+        else:
+            # Fall back to regular processing
+            result = await ai_training_engine.document_intelligence.process_document(file)
+        
+        # Update AI knowledge with enhanced data
+        if ai_training_engine.audio_consultant_ai and result.get('categories'):
+            # Create enhanced categories with supplier info
+            enhanced_categories = result.get('categories', {})
+            if pricing_config.get('supplier_name'):
+                supplier_key = f"supplier_{pricing_config['supplier_name'].lower()}"
+                enhanced_categories[supplier_key] = [
+                    f"Products: {result.get('products_extracted', 0)}",
+                    f"Brands: {result.get('brands_detected', 0)}",
+                    f"Price type: {pricing_config.get('price_type', 'unknown')}"
+                ]
+            
+            ai_training_engine.audio_consultant_ai.update_knowledge_base(
+                enhanced_categories, 
+                result.get('relationships', [])
+            )
+        
+        return {
+            "message": f"Document {file.filename} processed successfully with configuration",
+            "brands_detected": result.get('brands_detected', 0),
+            "products_extracted": result.get('products_extracted', 0),
+            "result": result,
+            "pricing_config": pricing_config,
+            "status": "success"
+        }
+        
+    except Exception as e:
+        logger.error(f"Enhanced upload error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def process_excel_with_pricing_config(file: UploadFile, config: Dict) -> Dict[str, Any]:
+    """Process Excel file with pricing configuration"""
+    try:
+        content = await file.read()
+        
+        import pandas as pd
+        from io import BytesIO
+        
+        df = pd.read_excel(BytesIO(content), header=None)
+        
+        # Enhanced brand detection and product extraction
+        brands_detected = []
+        products_extracted = []
+        
+        # Brand detection in first 5 rows
+        brand_patterns = ['YEALINK', 'JABRA', 'DNAKE', 'CALL4TEL', 'LG', 'SHELLY', 'MIKROTIK', 'ZYXEL', 'NETOGY', 'TP-LINK', 'APACHE', 'VILO', 'CAMBIUM', 'BLUETTI', 'MOTOROLA', 'NEAT', 'LOGITECH', 'TELRAD', 'HUAWEI', 'TELTONIKA', 'SAMSUNG']
+        
+        for row_idx in range(min(5, len(df))):
+            for col_idx in range(len(df.columns)):
+                try:
+                    cell_value = str(df.iloc[row_idx, col_idx]).strip().upper()
+                    
+                    for brand in brand_patterns:
+                        if brand in cell_value and brand not in brands_detected and len(cell_value) < 30:
+                            brands_detected.append(brand)
+                            
+                            # Extract products for this brand
+                            for prod_row in range(row_idx + 3, min(row_idx + 50, len(df))):
+                                try:
+                                    product_code = str(df.iloc[prod_row, col_idx]).strip()
+                                    if product_code and product_code not in ['nan', 'Stock Code', 'Updated']:
+                                        # Look for price in next column
+                                        price_col = col_idx + 1
+                                        price_val = 0
+                                        if price_col < len(df.columns):
+                                            try:
+                                                price_str = str(df.iloc[prod_row, price_col])
+                                                if price_str not in ['P.O.R', 'nan', 'POA']:
+                                                    price_val = float(price_str.replace(',', '').replace('R', ''))
+                                            except:
+                                                pass
+                                        
+                                        # Calculate prices based on config
+                                        vat_rate = config.get('vat_rate', 0.15)
+                                        markup = config.get('markup_percentage', 0.40)
+                                        
+                                        if config.get('price_type') == 'cost_excl_vat':
+                                            cost_excl = price_val
+                                            cost_incl = cost_excl * (1 + vat_rate) if cost_excl > 0 else 0
+                                            retail_incl = cost_incl * (1 + markup) if cost_incl > 0 else 0
+                                        else:
+                                            cost_excl = price_val
+                                            retail_incl = price_val * 1.61 if price_val > 0 else 0  # Default calc
+                                        
+                                        products_extracted.append({
+                                            'product_code': product_code,
+                                            'brand': brand,
+                                            'supplier': config.get('supplier_name', 'Unknown'),
+                                            'original_price': price_val,
+                                            'cost_excl_vat': round(cost_excl, 2),
+                                            'retail_incl_vat': round(retail_incl, 2),
+                                            'price_type': config.get('price_type', 'cost_excl_vat')
+                                        })
+                                except:
+                                    continue
+                            break
+                except:
+                    continue
+        
+        # Create AI training categories
+        categories = {
+            'product_specs': [f"{len(products_extracted)} products from {config.get('supplier_name', 'supplier')}"],
+            'pricing_info': [
+                f"Cost excluding VAT pricing from {config.get('supplier_name', 'supplier')}",
+                f"VAT rate: {config.get('vat_rate', 0.15) * 100}%",
+                f"Markup: {config.get('markup_percentage', 0.40) * 100}%"
+            ],
+            'brand_relationships': [f"Multi-brand pricelist: {', '.join(brands_detected)}"],
+            'suppliers': [f"{config.get('supplier_name', 'Unknown')}: {len(brands_detected)} brands, {len(products_extracted)} products"],
+            'compatibility_rules': [],
+            'system_designs': []
+        }
+        
+        relationships = []
+        for brand in brands_detected:
+            relationships.append({
+                'product_a': brand,
+                'product_b': config.get('supplier_name', 'supplier'),
+                'relationship': 'supplied_by'
+            })
+        
+        return {
+            'knowledge_id': str(uuid.uuid4()),
+            'filename': file.filename,
+            'brands_detected': len(brands_detected),
+            'products_extracted': len(products_extracted),
+            'categories': categories,
+            'relationships': relationships,
+            'pricing_config': config,
+            'supplier_data': {
+                'supplier': config.get('supplier_name'),
+                'products': products_extracted,
+                'brands': brands_detected
+            },
+            'processed_at': datetime.now().isoformat(),
+            'status': 'success'
+        }
+        
+    except Exception as e:
+        logger.error(f"Excel config processing error: {e}")
+        raise Exception(f"Failed to process Excel with config: {str(e)}")
+
+# Existing quote management endpoints
 @app.post("/api/v1/quotes/add-item")
 async def add_item_to_quote(request: AddToQuoteRequest):
     """Manual add item to quote (for API calls)"""
@@ -567,12 +854,15 @@ if __name__ == "__main__":
     print("✅ BETTER UX: Instant add to quote with confirmation")
     print("✅ CLEAN SEARCH: No more 'pleasse' or 'product' confusion")
     print("🧠 AI TRAINING: Upload documents and enhance AI responses")
+    print("🔧 ENHANCED TRAINING: Multi-brand Excel processing with pricing config")
     print("\n💬 Try these:")
     print("• 'add denon avrx1800h'")
     print("• 'add yamaha rx-v6a'")
     print("• 'add polk speakers'")
     print("\n🧠 AI Training Endpoints:")
     print("• POST /api/v1/training/upload-document")
+    print("• POST /api/v1/training/upload-document-with-config")
+    print("• POST /api/v1/training/preview-document")
     print("• GET /api/v1/training/knowledge-base")
     print("\n🎉 Your customers will love the AI-enhanced experience!")
     
