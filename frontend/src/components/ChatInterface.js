@@ -10,9 +10,14 @@ import {
   Card,
   CardContent,
   Divider,
-  IconButton
+  IconButton,
+  Chip,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction
 } from '@mui/material';
-import { Send, ArrowBack } from '@mui/icons-material';
+import { Send, ArrowBack, Delete } from '@mui/icons-material';
 import axios from 'axios';
 
 const ChatInterface = ({ category, onBack }) => {
@@ -25,7 +30,8 @@ const ChatInterface = ({ category, onBack }) => {
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [quote, setQuote] = useState({ items: [], total: 0 });
+  const [quote, setQuote] = useState({ items: [], total_amount: 0, total_savings: 0, item_count: 0 });
+  const [currentQuoteId, setCurrentQuoteId] = useState(null);
   
   // Add ref for auto-scrolling
   const messagesEndRef = useRef(null);
@@ -37,6 +43,30 @@ const ChatInterface = ({ category, onBack }) => {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+  // 🔥 NEW: Function to fetch updated quote
+  const fetchQuote = async (quoteId) => {
+    try {
+      const response = await axios.get(`http://localhost:8000/api/v1/quotes/${quoteId}`);
+      setQuote(response.data);
+      setCurrentQuoteId(quoteId);
+    } catch (error) {
+      console.error('Error fetching quote:', error);
+    }
+  };
+
+  // 🔥 NEW: Function to remove item from quote
+  const removeFromQuote = async (productId) => {
+    if (!currentQuoteId) return;
+    
+    try {
+      await axios.delete(`http://localhost:8000/api/v1/quotes/${currentQuoteId}/items/${productId}`);
+      // Refresh quote after removal
+      await fetchQuote(currentQuoteId);
+    } catch (error) {
+      console.error('Error removing item:', error);
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -54,7 +84,8 @@ const ChatInterface = ({ category, onBack }) => {
     try {
       const response = await axios.post('http://localhost:8000/api/v1/chat', {
         message: inputMessage,
-        category: category.id
+        category: category.id,
+        quote_id: currentQuoteId // Pass current quote ID
       });
 
       const assistantMessage = {
@@ -64,6 +95,13 @@ const ChatInterface = ({ category, onBack }) => {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+
+      // 🔥 KEY FIX: Check if item was added to quote and update UI
+      if (response.data.quote_id && response.data.auto_added) {
+        // Fetch the updated quote to display in Live Quote panel
+        await fetchQuote(response.data.quote_id);
+      }
+
     } catch (error) {
       console.error('Error sending message:', error);
       const errorMessage = {
@@ -113,7 +151,7 @@ const ChatInterface = ({ category, onBack }) => {
               </Typography>
               <Divider sx={{ mb: 2 }} />
               
-              {/* Messages Container - FIXED SCROLLING */}
+              {/* Messages Container */}
               <Box 
                 ref={chatContainerRef}
                 sx={{ 
@@ -123,7 +161,7 @@ const ChatInterface = ({ category, onBack }) => {
                   bgcolor: '#f8f9fa',
                   p: 2,
                   borderRadius: 2,
-                  maxHeight: '400px', // Fixed height for scrolling
+                  maxHeight: '400px',
                   '&::-webkit-scrollbar': {
                     width: '8px',
                   },
@@ -161,8 +199,8 @@ const ChatInterface = ({ category, onBack }) => {
                       <Typography 
                         variant="body2" 
                         sx={{ 
-                          whiteSpace: 'pre-line', // Preserves line breaks
-                          wordBreak: 'break-word' // Prevents overflow
+                          whiteSpace: 'pre-line',
+                          wordBreak: 'break-word'
                         }}
                       >
                         {message.content}
@@ -179,7 +217,6 @@ const ChatInterface = ({ category, onBack }) => {
                     </Paper>
                   </Box>
                 )}
-                {/* Invisible element to scroll to */}
                 <div ref={messagesEndRef} />
               </Box>
 
@@ -215,10 +252,10 @@ const ChatInterface = ({ category, onBack }) => {
           </Card>
         </Grid>
 
-        {/* Quote Summary */}
+        {/* 🔥 FIXED: Live Quote Panel */}
         <Grid item xs={12} md={4}>
           <Card sx={{ height: 600 }}>
-            <CardContent>
+            <CardContent sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <Typography variant="h6" gutterBottom>
                 📋 Live Quote
               </Typography>
@@ -231,7 +268,7 @@ const ChatInterface = ({ category, onBack }) => {
                     flexDirection: 'column', 
                     alignItems: 'center', 
                     justifyContent: 'center',
-                    height: 300,
+                    flex: 1,
                     color: 'text.secondary'
                   }}
                 >
@@ -244,11 +281,92 @@ const ChatInterface = ({ category, onBack }) => {
                   </Typography>
                 </Box>
               ) : (
-                <Box>
-                  {/* Quote items will be added here */}
-                  <Typography variant="body2">
-                    Quote items will appear here as you chat...
-                  </Typography>
+                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  {/* Quote Items */}
+                  <Box sx={{ flex: 1, overflowY: 'auto', mb: 2 }}>
+                    <List dense>
+                      {quote.items.map((item, index) => (
+                        <ListItem key={index} sx={{ bgcolor: '#f5f5f5', mb: 1, borderRadius: 1 }}>
+                          <ListItemText
+                            primary={
+                              <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+                                {item.name}
+                              </Typography>
+                            }
+                            secondary={
+                              <Box>
+                                <Typography variant="body2" color="text.secondary">
+                                  Model: {item.model}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                  Qty: {item.quantity}
+                                </Typography>
+                                <Box sx={{ mt: 1 }}>
+                                  {item.has_special_price ? (
+                                    <Box>
+                                      <Chip 
+                                        label={`R${item.price.toLocaleString()}`}
+                                        color="success" 
+                                        size="small" 
+                                        sx={{ mr: 1 }}
+                                      />
+                                      <Chip 
+                                        label={`Save R${item.savings?.toLocaleString()}`}
+                                        color="warning" 
+                                        size="small"
+                                      />
+                                    </Box>
+                                  ) : (
+                                    <Chip 
+                                      label={`R${item.price.toLocaleString()}`}
+                                      variant="outlined" 
+                                      size="small"
+                                    />
+                                  )}
+                                </Box>
+                              </Box>
+                            }
+                          />
+                          <ListItemSecondaryAction>
+                            <IconButton 
+                              edge="end" 
+                              onClick={() => removeFromQuote(item.product_id)}
+                              size="small"
+                              color="error"
+                            >
+                              <Delete />
+                            </IconButton>
+                          </ListItemSecondaryAction>
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Box>
+
+                  {/* Quote Summary */}
+                  <Divider sx={{ mb: 2 }} />
+                  <Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography variant="body2">Items:</Typography>
+                      <Typography variant="body2">{quote.item_count}</Typography>
+                    </Box>
+                    {quote.total_savings > 0 && (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography variant="body2" color="success.main">Total Savings:</Typography>
+                        <Typography variant="body2" color="success.main">
+                          R{quote.total_savings.toLocaleString()}
+                        </Typography>
+                      </Box>
+                    )}
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                      <Typography variant="h6">Total:</Typography>
+                      <Typography variant="h6" color="primary">
+                        R{quote.total_amount.toLocaleString()}
+                      </Typography>
+                    </Box>
+                    <Button variant="contained" fullWidth disabled={quote.items.length === 0}>
+                      Generate Quote PDF
+                    </Button>
+                  </Box>
                 </Box>
               )}
             </CardContent>

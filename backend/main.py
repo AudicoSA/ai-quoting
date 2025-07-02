@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException
+# Create the enhanced main.py with AI training capabilities
+enhanced_code = '''from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import json
@@ -8,15 +9,19 @@ import logging
 from datetime import datetime
 import uuid
 
+# Add these imports at the top
+from ai_training_engine import initialize_ai_training, document_intelligence, audio_consultant_ai
+import os
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Create FastAPI app instance
 app = FastAPI(
-    title="Audico AI - Auto-Add Enhanced Quoting System",
-    description="Audio Equipment Solutions with Smart Auto-Add and Live Quoting",
-    version="4.0.0"
+    title="Audico AI - Auto-Add Enhanced Quoting System with AI Training",
+    description="Audio Equipment Solutions with Smart Auto-Add, Live Quoting, and AI Training",
+    version="5.0.0"
 )
 
 # CORS middleware
@@ -27,6 +32,17 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
+
+# Add after app initialization
+@app.on_event("startup")
+async def startup_event():
+    """Initialize AI training on startup"""
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    if openai_api_key:
+        initialize_ai_training(openai_api_key)
+        logger.info("🧠 AI Training System initialized")
+    else:
+        logger.warning("⚠️ OPENAI_API_KEY not set - AI training disabled")
 
 # In-memory quote storage
 active_quotes = {}
@@ -65,14 +81,14 @@ class Quote(BaseModel):
 @app.get("/")
 async def root():
     return {
-        "message": "Audico AI Auto-Add Enhanced Quoting System", 
-        "version": "4.0.0",
-        "features": ["🎯 Smart Auto-Add", "💰 Fixed Special Pricing", "🔍 Working Search", "📦 Live Quotes"]
+        "message": "Audico AI Auto-Add Enhanced Quoting System with AI Training", 
+        "version": "5.0.0",
+        "features": ["🎯 Smart Auto-Add", "💰 Fixed Special Pricing", "🔍 Working Search", "📦 Live Quotes", "🧠 AI Training"]
     }
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "Audico AI Auto-Add Backend", "version": "4.0.0"}
+    return {"status": "healthy", "service": "Audico AI Auto-Add Backend with AI Training", "version": "5.0.0"}
 
 async def auto_add_to_quote(product: Dict, quote_id: str, quantity: int = 1) -> Dict:
     """Automatically add product to quote"""
@@ -151,66 +167,67 @@ async def auto_add_to_quote(product: Dict, quote_id: str, quantity: int = 1) -> 
         logger.error(f"Auto-add error: {e}")
         return {"error": str(e)}
 
+# Replace your chat endpoint with this enhanced version
 @app.post("/api/v1/chat")
-async def enhanced_chat_endpoint(chat_data: ChatMessage):
-    """🎯 Enhanced chat with SMART AUTO-ADD functionality"""
+async def enhanced_ai_chat_endpoint(chat_data: ChatMessage):
+    """🧠 ENHANCED AI CHAT with training knowledge"""
     try:
         user_message = chat_data.message
         category = chat_data.category
         quote_id = chat_data.quote_id
         
-        logger.info(f"🎯 AUTO-ADD CHAT: '{user_message}' for category: '{category}'")
+        logger.info(f"🧠 AI ENHANCED CHAT: '{user_message}' for category: '{category}'")
         
         # Check if user wants to add a product
         if any(keyword in user_message.lower() for keyword in ["add", "quote", "price", "cost"]):
-            # Extract search terms (FIXED to exclude common words properly)
+            # Your existing search and auto-add logic here...
             search_terms = []
             words = user_message.split()
             
             for word in words:
-                # FIXED: Better word filtering to exclude typos and common words
                 if (len(word) > 2 and 
                     not word.lower() in ['please', 'pleasse', 'quote', 'price', 'cost', 'add', 'the', 'to', 'a', 'you', 'would', 'like', 'i', 'want', 'need']):
                     search_terms.append(word)
             
             if search_terms:
                 exact_search = " ".join(search_terms)
-                logger.info(f"🔍 SEARCHING FOR: '{exact_search}'")
-                
-                # Search for products
                 products = sqlantern_db.search_products(exact_search, limit=10, include_out_of_stock=False)
                 
                 if products:
-                    best_match = products[0]  # Take the best match
-                    
-                    # 🎯 AUTO-ADD MAGIC: Automatically add the best match to quote
+                    best_match = products[0]
                     add_result = await auto_add_to_quote(best_match, quote_id)
                     
                     if add_result.get('success'):
-                        # Create success response
-                        response = f"✅ **Added to Quote: {best_match['name']}**\n\n"
-                        
-                        if best_match.get('has_special_price'):
-                            response += f"💰 **SPECIAL PRICE: {best_match['price_formatted']}** "
-                            if best_match.get('original_price_formatted'):
-                                response += f"~~{best_match['original_price_formatted']}~~ "
-                            if best_match.get('savings_formatted'):
-                                response += f"(Save {best_match['savings_formatted']}!) ⚡"
-                            response += "\n"
+                        # 🧠 ENHANCED: Use AI for professional response
+                        if audio_consultant_ai:
+                            response = await audio_consultant_ai.generate_professional_response(
+                                user_message, products, {"quote_added": True}, category
+                            )
                         else:
-                            response += f"💰 Price: {best_match['price_formatted']}\n"
-                        
-                        response += f"📦 Quantity: 1\n"
-                        response += f"🔢 Model: {best_match.get('model', 'N/A')}\n\n"
-                        
-                        # Quote summary
-                        summary = add_result['quote_summary']
-                        response += f"**Quote Total: R{summary['total_amount']:,.2f}**"
-                        if summary['total_savings'] > 0:
-                            response += f" (Save R{summary['total_savings']:,.2f}!)"
-                        response += f"\n"
-                        response += f"Items in quote: {summary['items']}\n\n"
-                        response += "**Would you like to add anything else to complete your audio system?**"
+                            # Fallback to original response
+                            response = f"✅ **Added to Quote: {best_match['name']}**\\n\\n"
+                            
+                            if best_match.get('has_special_price'):
+                                response += f"💰 **SPECIAL PRICE: {best_match['price_formatted']}** "
+                                if best_match.get('original_price_formatted'):
+                                    response += f"~~{best_match['original_price_formatted']}~~ "
+                                if best_match.get('savings_formatted'):
+                                    response += f"(Save {best_match['savings_formatted']}!) ⚡"
+                                response += "\\n"
+                            else:
+                                response += f"💰 Price: {best_match['price_formatted']}\\n"
+                            
+                            response += f"📦 Quantity: 1\\n"
+                            response += f"🔢 Model: {best_match.get('model', 'N/A')}\\n\\n"
+                            
+                            # Quote summary
+                            summary = add_result['quote_summary']
+                            response += f"**Quote Total: R{summary['total_amount']:,.2f}**"
+                            if summary['total_savings'] > 0:
+                                response += f" (Save R{summary['total_savings']:,.2f}!)"
+                            response += f"\\n"
+                            response += f"Items in quote: {summary['items']}\\n\\n"
+                            response += "**Would you like to add anything else to complete your audio system?**"
                         
                         return {
                             "response": response,
@@ -219,8 +236,8 @@ async def enhanced_chat_endpoint(chat_data: ChatMessage):
                             "quote_id": add_result['quote_id'],
                             "item_added": add_result['item_added'],
                             "quote_summary": add_result['quote_summary'],
-                            "search_type": "auto_add_success",
                             "auto_added": True,
+                            "ai_enhanced": True,
                             "status": "success"
                         }
                     else:
@@ -239,14 +256,14 @@ async def enhanced_chat_endpoint(chat_data: ChatMessage):
                             broader_products.extend(broader)
                     
                     if broader_products:
-                        response = f"❌ I couldn't find '{exact_search}' exactly, but found similar products:\n\n🔍 **Similar Products:**\n"
+                        response = f"❌ I couldn't find '{exact_search}' exactly, but found similar products:\\n\\n🔍 **Similar Products:**\\n"
                         for product in broader_products[:3]:
-                            response += f"\n• {product['name']} - {product['price_formatted']}"
+                            response += f"\\n• {product['name']} - {product['price_formatted']}"
                             if product.get('has_special_price'):
                                 response += " ⚡ SPECIAL!"
-                        response += f"\n\n💡 **Try searching with exact model numbers for better results.**"
+                        response += f"\\n\\n💡 **Try searching with exact model numbers for better results.**"
                     else:
-                        response = f"❌ I couldn't find '{exact_search}' in our current inventory.\n\n💡 **Search Tips:**\n• Try exact model numbers: 'AVR-X1800H' or 'AVRX1800H'\n• Use brand names: 'Denon', 'Yamaha'\n• Check spelling and try variations\n\n**What specific audio equipment are you looking for?**"
+                        response = f"❌ I couldn't find '{exact_search}' in our current inventory.\\n\\n💡 **Search Tips:**\\n• Try exact model numbers: 'AVR-X1800H' or 'AVRX1800H'\\n• Use brand names: 'Denon', 'Yamaha'\\n• Check spelling and try variations\\n\\n**What specific audio equipment are you looking for?**"
                     
                     return {
                         "response": response,
@@ -257,34 +274,78 @@ async def enhanced_chat_endpoint(chat_data: ChatMessage):
                         "status": "no_results"
                     }
         
-        # General welcome response
+        # 🧠 ENHANCED: General queries use AI consultant
         else:
-            response = f"👋 **Welcome to Audico AI for {category.title()}!**\n\n"
-            response += "I'm here to help you build the perfect audio system with our latest inventory.\n\n"
-            response += "🎯 **I can help you:**\n"
-            response += "• Find and add products instantly (try: 'add Denon AVR-X1800H')\n"
-            response += "• Get accurate pricing with special offers\n"
-            response += "• Build and manage live quotes\n"
-            response += "• Recommend complete audio solutions\n\n"
-            response += "**What audio equipment are you looking for today?**\n\n"
-            response += "💡 *Just say 'add [product name]' and I'll automatically add it to your quote!*"
+            if audio_consultant_ai:
+                response = await audio_consultant_ai.generate_professional_response(
+                    user_message, [], {}, category
+                )
+            else:
+                # Your existing fallback response
+                response = f"👋 **Welcome to Audico AI for {category.title()}!**\\n\\n"
+                response += "I'm here to help you build the perfect audio system with our latest inventory.\\n\\n"
+                response += "🎯 **I can help you:**\\n"
+                response += "• Find and add products instantly (try: 'add Denon AVR-X1800H')\\n"
+                response += "• Get accurate pricing with special offers\\n"
+                response += "• Build and manage live quotes\\n"
+                response += "• Recommend complete audio solutions\\n\\n"
+                response += "**What audio equipment are you looking for today?**\\n\\n"
+                response += "💡 *Just say 'add [product name]' and I'll automatically add it to your quote!*"
             
             return {
                 "response": response,
                 "category": category,
                 "user_message": user_message,
-                "search_type": "welcome",
-                "auto_added": False,
+                "search_type": "ai_enhanced_welcome",
+                "ai_enhanced": True,
                 "status": "success"
             }
         
     except Exception as e:
-        logger.error(f"Enhanced chat error: {str(e)}")
+        logger.error(f"Enhanced AI chat error: {str(e)}")
         return {
             "response": "I'm having trouble right now. Please try again.",
             "error": str(e),
             "status": "error"
         }
+
+# Add training endpoints
+@app.post("/api/v1/training/upload-document")
+async def upload_training_document(file: UploadFile = File(...)):
+    """Upload document for AI training"""
+    if not document_intelligence:
+        raise HTTPException(status_code=503, detail="AI training not initialized")
+    
+    try:
+        result = await document_intelligence.process_document(file)
+        
+        # Update AI knowledge
+        if audio_consultant_ai and result.get('categories') and result.get('relationships'):
+            audio_consultant_ai.update_knowledge_base(
+                result['categories'], 
+                result['relationships']
+            )
+        
+        return {
+            "message": f"Document {file.filename} processed successfully",
+            "result": result,
+            "status": "success"
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/v1/training/knowledge-base")
+async def get_knowledge_base():
+    """Get current AI knowledge base"""
+    if not audio_consultant_ai:
+        raise HTTPException(status_code=503, detail="AI training not initialized")
+    
+    return {
+        "knowledge_base": audio_consultant_ai.knowledge_base,
+        "categories": list(audio_consultant_ai.knowledge_base.keys()),
+        "status": "success"
+    }
 
 @app.post("/api/v1/quotes/add-item")
 async def add_item_to_quote(request: AddToQuoteRequest):
@@ -448,18 +509,36 @@ async def list_quotes():
 
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 Starting Audico AI AUTO-ADD Enhanced Backend...")
+    print("🚀 Starting Audico AI AUTO-ADD Enhanced Backend with AI Training...")
     print("📊 Server: http://localhost:8000")
     print("📚 API Docs: http://localhost:8000/docs")
-    print("\n🎯 NEW FEATURES:")
+    print("\\n🎯 FEATURES:")
     print("✅ SMART AUTO-ADD: Just say 'add denon avrx1800h' - no more choosing!")
     print("✅ FIXED PRICING: R15,990 special price displays correctly")
     print("✅ BETTER UX: Instant add to quote with confirmation")
     print("✅ CLEAN SEARCH: No more 'pleasse' or 'product' confusion")
-    print("\n💬 Try these:")
+    print("🧠 AI TRAINING: Upload documents and enhance AI responses")
+    print("\\n💬 Try these:")
     print("• 'add denon avrx1800h'")
     print("• 'add yamaha rx-v6a'")
     print("• 'add polk speakers'")
-    print("\n🎉 Your customers will love the instant experience!")
+    print("\\n🧠 AI Training Endpoints:")
+    print("• POST /api/v1/training/upload-document")
+    print("• GET /api/v1/training/knowledge-base")
+    print("\\n🎉 Your customers will love the AI-enhanced experience!")
     
     uvicorn.run(app, host="0.0.0.0", port=8000)
+'''
+
+# Write the enhanced code to a file
+with open('enhanced_main.py', 'w') as f:
+    f.write(enhanced_code)
+
+print("✅ Enhanced main.py created with AI training capabilities!")
+print("\\n🧠 New AI Features Added:")
+print("• AI Training System initialization on startup")
+print("• Enhanced chat endpoint with AI-powered responses")
+print("• Document upload endpoint for training")
+print("• Knowledge base retrieval endpoint")
+print("• Professional AI response generation")
+print("\\n📁 File saved as: enhanced_main.py")
