@@ -16,14 +16,15 @@ import logging
 from datetime import datetime
 import uuid
 
-# AI training imports (with error handling)
+# AI training imports - CORRECTED STRATEGY
 try:
-    from ai_training_engine import initialize_ai_training, document_intelligence, audio_consultant_ai
-except ImportError:
-    initialize_ai_training = None
-    document_intelligence = None
-    audio_consultant_ai = None
-    print("⚠️ AI training engine not available - continuing without AI features")
+    import ai_training_engine
+    ai_training_available = True
+    print("✅ AI training engine imported successfully")
+except ImportError as e:
+    ai_training_engine = None
+    ai_training_available = False
+    print(f"⚠️ AI training engine not available: {e}")
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -45,21 +46,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize AI training on startup
+# Initialize AI training on startup - CORRECTED
 @app.on_event("startup")
 async def startup_event():
     """Initialize AI training on startup"""
     openai_api_key = os.getenv("OPENAI_API_KEY")
-    if openai_api_key and initialize_ai_training:
+    if openai_api_key and ai_training_available:
         try:
-            initialize_ai_training(openai_api_key)
-            logger.info("🧠 AI Training System initialized successfully")
+            result = ai_training_engine.initialize_ai_training(openai_api_key)
+            if result:
+                logger.info("🧠 AI Training System initialized successfully")
+                # Debug verification
+                print(f"DEBUG: document_intelligence = {ai_training_engine.document_intelligence is not None}")
+                print(f"DEBUG: audio_consultant_ai = {ai_training_engine.audio_consultant_ai is not None}")
+            else:
+                logger.error("❌ AI Training System failed to initialize")
         except Exception as e:
             logger.error(f"AI Training initialization failed: {e}")
     else:
         if not openai_api_key:
             logger.warning("⚠️ OPENAI_API_KEY not set - AI training disabled")
-        if not initialize_ai_training:
+        if not ai_training_available:
             logger.warning("⚠️ AI training engine not available")
 
 # In-memory quote storage
@@ -101,12 +108,18 @@ async def root():
     return {
         "message": "Audico AI Auto-Add Enhanced Quoting System with AI Training", 
         "version": "5.0.0",
-        "features": ["🎯 Smart Auto-Add", "💰 Fixed Special Pricing", "🔍 Working Search", "📦 Live Quotes", "🧠 AI Training"]
+        "features": ["🎯 Smart Auto-Add", "💰 Fixed Special Pricing", "🔍 Working Search", "📦 Live Quotes", "🧠 AI Training"],
+        "ai_training_available": ai_training_available
     }
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "Audico AI Auto-Add Backend with AI Training", "version": "5.0.0"}
+    return {
+        "status": "healthy", 
+        "service": "Audico AI Auto-Add Backend with AI Training", 
+        "version": "5.0.0",
+        "ai_training_status": "available" if ai_training_available else "unavailable"
+    }
 
 async def auto_add_to_quote(product: Dict, quote_id: str, quantity: int = 1) -> Dict:
     """Automatically add product to quote"""
@@ -216,16 +229,15 @@ async def enhanced_ai_chat_endpoint(chat_data: ChatMessage):
                     
                     if add_result.get('success'):
                         # 🧠 ENHANCED: Use AI for professional response if available
-                        if audio_consultant_ai:
+                        response = None
+                        if ai_training_available and ai_training_engine.audio_consultant_ai:
                             try:
-                                response = await audio_consultant_ai.generate_professional_response(
+                                response = await ai_training_engine.audio_consultant_ai.generate_professional_response(
                                     user_message, products, {"quote_added": True}, category
                                 )
                             except Exception as e:
                                 logger.error(f"AI response generation failed: {e}")
                                 response = None
-                        else:
-                            response = None
                         
                         # Fallback to original response if AI not available
                         if not response:
@@ -261,7 +273,7 @@ async def enhanced_ai_chat_endpoint(chat_data: ChatMessage):
                             "item_added": add_result['item_added'],
                             "quote_summary": add_result['quote_summary'],
                             "auto_added": True,
-                            "ai_enhanced": True,
+                            "ai_enhanced": ai_training_available and ai_training_engine.audio_consultant_ai is not None,
                             "status": "success"
                         }
                     else:
@@ -301,9 +313,9 @@ async def enhanced_ai_chat_endpoint(chat_data: ChatMessage):
         # 🧠 ENHANCED: General queries use AI consultant if available
         else:
             response = None
-            if audio_consultant_ai:
+            if ai_training_available and ai_training_engine.audio_consultant_ai:
                 try:
-                    response = await audio_consultant_ai.generate_professional_response(
+                    response = await ai_training_engine.audio_consultant_ai.generate_professional_response(
                         user_message, [], {}, category
                     )
                 except Exception as e:
@@ -326,7 +338,7 @@ async def enhanced_ai_chat_endpoint(chat_data: ChatMessage):
                 "category": category,
                 "user_message": user_message,
                 "search_type": "ai_enhanced_welcome",
-                "ai_enhanced": True,
+                "ai_enhanced": ai_training_available and ai_training_engine.audio_consultant_ai is not None,
                 "status": "success"
             }
         
@@ -338,19 +350,22 @@ async def enhanced_ai_chat_endpoint(chat_data: ChatMessage):
             "status": "error"
         }
 
-# Add training endpoints
+# CORRECTED training endpoints
 @app.post("/api/v1/training/upload-document")
 async def upload_training_document(file: UploadFile = File(...)):
     """Upload document for AI training"""
-    if not document_intelligence:
-        raise HTTPException(status_code=503, detail="AI training not initialized")
+    if not ai_training_available:
+        raise HTTPException(status_code=503, detail="AI training engine not available")
+    
+    if not ai_training_engine.document_intelligence:
+        raise HTTPException(status_code=503, detail="AI training not initialized - missing OpenAI API key")
     
     try:
-        result = await document_intelligence.process_document(file)
+        result = await ai_training_engine.document_intelligence.process_document(file)
         
         # Update AI knowledge
-        if audio_consultant_ai and result.get('categories') and result.get('relationships'):
-            audio_consultant_ai.update_knowledge_base(
+        if ai_training_engine.audio_consultant_ai and result.get('categories') and result.get('relationships'):
+            ai_training_engine.audio_consultant_ai.update_knowledge_base(
                 result['categories'], 
                 result['relationships']
             )
@@ -362,17 +377,22 @@ async def upload_training_document(file: UploadFile = File(...)):
         }
         
     except Exception as e:
+        logger.error(f"Document processing error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/v1/training/knowledge-base")
 async def get_knowledge_base():
     """Get current AI knowledge base"""
-    if not audio_consultant_ai:
-        raise HTTPException(status_code=503, detail="AI training not initialized")
+    if not ai_training_available:
+        raise HTTPException(status_code=503, detail="AI training engine not available")
+    
+    if not ai_training_engine.audio_consultant_ai:
+        raise HTTPException(status_code=503, detail="AI training not initialized - missing OpenAI API key")
     
     return {
-        "knowledge_base": audio_consultant_ai.knowledge_base,
-        "categories": list(audio_consultant_ai.knowledge_base.keys()),
+        "knowledge_base": ai_training_engine.audio_consultant_ai.knowledge_base,
+        "categories": list(ai_training_engine.audio_consultant_ai.knowledge_base.keys()),
+        "total_items": sum(len(items) for items in ai_training_engine.audio_consultant_ai.knowledge_base.values()),
         "status": "success"
     }
 
