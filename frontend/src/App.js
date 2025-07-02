@@ -9,9 +9,12 @@ import {
   Button,
   Box,
   AppBar,
-  Toolbar
+  Toolbar,
+  IconButton
 } from '@mui/material';
+import { Psychology } from '@mui/icons-material';
 import ChatInterface from './components/ChatInterface';
+import TrainingInterface from './components/TrainingInterface';
 
 const categories = [
   { id: 'restaurants', name: 'RESTAURANTS', description: 'Background music, zone control, dining atmosphere', color: '#4CAF50' },
@@ -26,12 +29,20 @@ const categories = [
 
 function App() {
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [showTraining, setShowTraining] = useState(false);
 
   const handleCategorySelect = (category) => {
     setSelectedCategory(category);
+    setShowTraining(false);
   };
 
   const handleBackToCategories = () => {
+    setSelectedCategory(null);
+    setShowTraining(false);
+  };
+
+  const handleShowTraining = () => {
+    setShowTraining(true);
     setSelectedCategory(null);
   };
 
@@ -42,11 +53,21 @@ function App() {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             Audico AI Audio Solutions
           </Typography>
+          <IconButton 
+            color="inherit" 
+            onClick={handleShowTraining}
+            title="AI Training Center"
+            sx={{ ml: 2 }}
+          >
+            <Psychology />
+          </IconButton>
         </Toolbar>
       </AppBar>
 
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        {!selectedCategory ? (
+        {showTraining ? (
+          <TrainingInterface onBack={handleBackToCategories} />
+        ) : !selectedCategory ? (
           <>
             <Box textAlign="center" mb={4}>
               <Typography variant="h3" component="h1" gutterBottom>
@@ -55,6 +76,14 @@ function App() {
               <Typography variant="h6" color="text.secondary" gutterBottom>
                 Which audio system do you need assistance with?
               </Typography>
+              <Button 
+                variant="outlined" 
+                startIcon={<Psychology />}
+                onClick={handleShowTraining}
+                sx={{ mt: 2 }}
+              >
+                AI Training Center
+              </Button>
             </Box>
 
             <Grid container spacing={3}>
