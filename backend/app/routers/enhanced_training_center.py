@@ -11,7 +11,7 @@ import tempfile
 logger = logging.getLogger(__name__)
 
 # Use /enhanced prefix to match frontend call
-router = APIRouter(prefix="/training-center/enhanced", tags=["enhanced-training-center"])
+router = APIRouter(prefix="/api/v1/training-center/enhanced", tags=["enhanced-training-center"])
 
 @router.post("/upload/advanced")
 async def enhanced_upload_endpoint(file: UploadFile = File(...)):

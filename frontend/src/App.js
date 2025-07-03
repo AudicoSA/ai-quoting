@@ -19,6 +19,15 @@ import {
 } from '@mui/material';
 import { Psychology, School, AutoAwesome } from '@mui/icons-material';
 
+import TrainingStatus from './components/TrainingCenter/TrainingStatus';
+
+{trainingMode === 'enhanced' && (
+  <Box>
+    <TrainingStatus />  {/* Add this line */}
+    <EnhancedUploadCenter />
+  </Box>
+)}
+
 // Your existing components
 import ChatInterface from './components/ChatInterface';
 import TrainingInterface from './components/TrainingInterface';
