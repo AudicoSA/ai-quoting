@@ -1,4 +1,4 @@
-# backend/main.py (COMPLETE IMPORTS SECTION)
+# backend/main.py (COMPLETE CORRECTED VERSION - 665+ lines preserved)
 # Load environment variables first - MUST be at the top
 from dotenv import load_dotenv
 import os
@@ -18,28 +18,10 @@ import uuid
 import tempfile
 
 # Database imports
-from app.db.sqlantern import sqlantern_db  # ADD THIS LINE
+from app.db.sqlantern import sqlantern_db
 
 # Router imports
 from app.routers import enhanced_training_center
-
-# Create FastAPI app
-app = FastAPI()
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Include enhanced training center router
-app.include_router(enhanced_training_center.router)
 
 # AI training imports - CORRECTED STRATEGY
 try:
@@ -55,14 +37,14 @@ except ImportError as e:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app instance
+# Create FastAPI app instance (SINGLE DECLARATION - FIXED)
 app = FastAPI(
     title="Audico AI - Auto-Add Enhanced Quoting System with AI Training Center",
     description="Audio Equipment Solutions with Smart Auto-Add, Live Quoting, and Complete AI Training Center",
     version="6.0.0"
 )
 
-# CORS middleware
+# CORS middleware (MOVED AFTER app creation)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
@@ -71,7 +53,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize AI training on startup - CORRECTED
+# Include enhanced training center router (MOVED AFTER app creation)
+app.include_router(enhanced_training_center.router)
+
+# Initialize AI training on startup
 @app.on_event("startup")
 async def startup_event():
     """Initialize AI training on startup"""
@@ -81,7 +66,6 @@ async def startup_event():
             result = ai_training_engine.initialize_ai_training(openai_api_key)
             if result:
                 logger.info("🧠 AI Training System initialized successfully")
-                # Debug verification
                 print(f"DEBUG: document_intelligence = {ai_training_engine.document_intelligence is not None}")
                 print(f"DEBUG: audio_consultant_ai = {ai_training_engine.audio_consultant_ai is not None}")
             else:
