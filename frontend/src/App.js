@@ -35,6 +35,13 @@ import TrainingInterface from './components/TrainingInterface';
 // NEW: Import our enhanced training center
 import EnhancedUploadCenter from './components/TrainingCenter/Enhanced/EnhancedUploadCenter';
 
+{trainingMode === 'enhanced' && (
+  <Box>
+    <TrainingStatus />  {/* Add this line */}
+    <EnhancedUploadCenter />
+  </Box>
+)}
+
 const categories = [
   { id: 'restaurants', name: 'RESTAURANTS', description: 'Background music, zone control, dining atmosphere', color: '#4CAF50' },
   { id: 'home', name: 'HOME', description: 'Home theater, music systems, hi-fi setups', color: '#2196F3' },
