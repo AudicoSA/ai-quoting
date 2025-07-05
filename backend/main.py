@@ -1,4 +1,4 @@
-# backend/main.py (COMPLETE CORRECTED VERSION - 665+ lines preserved)
+# backend/main.py (COMPLETE CORRECTED VERSION - All functionality preserved)
 # Load environment variables first - MUST be at the top
 from dotenv import load_dotenv
 import os
@@ -364,51 +364,8 @@ async def enhanced_ai_chat_endpoint(chat_data: ChatMessage):
         }
 
 # =============================================================================
-# 🧠 ENHANCED AI TRAINING CENTER - YOUR REQUESTED FUNCTIONALITY
+# 🧠 ENHANCED AI TRAINING CENTER - SUPPORTING FUNCTIONS
 # =============================================================================
-
-# @app.post("/api/v1/training-center/advanced-upload")
-# async def training_center_advanced_upload(
-#   file: UploadFile = File(...),
-#    supplier_name: Optional[str] = Form(None),
-#    background_tasks: BackgroundTasks = None
-# ):
-#    """🚀 AI Training Center Advanced Upload - Handles your 40+ pricelist formats"""
-    if not file.filename.endswith(('.xlsx', '.xls')):
-        raise HTTPException(status_code=400, detail="Only Excel files (.xlsx, .xls) are supported")
-    
-    try:
-        # Quick AI-powered structure detection
-        content = await file.read()
-        
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp_file:
-            tmp_file.write(content)
-            tmp_file_path = tmp_file.name
-        
-        # AI-powered parsing for your Nology format and others
-        result = await ai_parse_pricelist(tmp_file_path, supplier_name or file.filename)
-        
-        if result['success']:
-            return {
-                "success": True,
-                "message": f"🎉 AI Training Center successfully parsed {result['total_products']} products from {result['brands_detected']} brands!",
-                "preview": {
-                    "total_products": result['total_products'],
-                    "brands_detected": result['brands_detected'],
-                    "structure_type": result['structure_type'],
-                    "sample_products": result['products'][:5],
-                    "brands_found": list(set(p['brand'] for p in result['products'][:20]))
-                },
-                "status": "completed"
-            }
-        else:
-            raise HTTPException(status_code=400, detail=f"AI parsing failed: {result.get('error')}")
-    
-    finally:
-        try:
-            os.unlink(tmp_file_path)
-        except:
-            pass
 
 async def ai_parse_pricelist(file_path: str, supplier_name: str = None) -> Dict[str, Any]:
     """AI-powered pricelist parser for your 40+ different formats"""
@@ -543,7 +500,7 @@ async def get_training_status():
         "ai_training_available": ai_training_available,
         "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
         "document_intelligence_ready": ai_training_engine.document_intelligence is not None if ai_training_available else False,
-        "audio_consultant_ready": audio_consultant_ai is not None,
+        "audio_consultant_ready": ai_training_engine.audio_consultant_ai is not None if ai_training_available else False,
         "knowledge_base_summary": ai_training_engine.get_enhanced_knowledge_base_summary() if ai_training_available else {},
         "system_status": "operational" if ai_training_available else "configuration_needed"
     }
@@ -696,7 +653,7 @@ if __name__ == "__main__":
     print("📦 LIVE QUOTES: Real-time quote building")
     print("🧠 AI TRAINING CENTER: Advanced upload for your 40+ pricelists")
     print("\n🎯 ENHANCED TRAINING CENTER:")
-    print("• POST /api/v1/training-center/advanced-upload (NEW)")
+    print("• Enhanced router endpoints working")
     print("• GET /api/v1/training-center/stats")
     print("• Your original training endpoints preserved")
     print("\n🎉 YOUR BEAUTIFUL QUOTE SYSTEM IS BACK!")
