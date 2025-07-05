@@ -566,6 +566,39 @@ async def get_training_progress():
         "last_updated": datetime.now().isoformat()
     }   
 
+@app.get("/api/v1/training/knowledge-base")
+async def get_knowledge_base():
+    """Get knowledge base summary for UI"""
+    if not ai_training_available:
+        return {
+            "status": "unavailable",
+            "error": "Training system not available",
+            "knowledge_base": {},
+            "total_products": 0,
+            "suppliers": {},
+            "categories": {}
+        }
+    
+    try:
+        summary = ai_training_engine.get_enhanced_knowledge_base_summary()
+        return {
+            "status": "success",
+            "knowledge_base": summary,
+            "total_products": summary.get('total_products', 0),
+            "suppliers": summary.get('suppliers', {}),
+            "categories": summary.get('categories', {})
+        }
+    except Exception as e:
+        logger.error(f"Knowledge base error: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "knowledge_base": {},
+            "total_products": 0,
+            "suppliers": {},
+            "categories": {}
+        }
+
 # ALL YOUR ORIGINAL QUOTE ENDPOINTS (preserved exactly)
 @app.post("/api/v1/quotes/add-item")
 async def add_item_to_quote(request: AddToQuoteRequest):
