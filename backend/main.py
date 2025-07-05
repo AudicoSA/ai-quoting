@@ -536,13 +536,13 @@ async def upload_training_document(file: UploadFile = File(...)):
         logger.error(f"Document processing error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
- @app.get("/api/v1/training/status")
+@app.get("/api/v1/training/status")
 async def get_training_status():
     """Get current training system status"""
     return {
         "ai_training_available": ai_training_available,
         "openai_configured": bool(os.getenv("OPENAI_API_KEY")),
-        "document_intelligence_ready": document_intelligence is not None,
+        "document_intelligence_ready": ai_training_engine.document_intelligence is not None if ai_training_available else False,
         "audio_consultant_ready": audio_consultant_ai is not None,
         "knowledge_base_summary": ai_training_engine.get_enhanced_knowledge_base_summary() if ai_training_available else {},
         "system_status": "operational" if ai_training_available else "configuration_needed"

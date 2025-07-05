@@ -1,4 +1,4 @@
-// frontend/src/App.js (COMPLETE ENHANCED VERSION)
+// frontend/src/App.js (COMPLETE VERSION WITH ENHANCED UPLOAD CENTER)
 import React, { useState } from 'react';
 import {
   Container,
@@ -19,28 +19,12 @@ import {
 } from '@mui/material';
 import { Psychology, School, AutoAwesome } from '@mui/icons-material';
 
-import TrainingStatus from './components/TrainingCenter/TrainingStatus';
-
-{trainingMode === 'enhanced' && (
-  <Box>
-    <TrainingStatus />  {/* Add this line */}
-    <EnhancedUploadCenter />
-  </Box>
-)}
-
 // Your existing components
 import ChatInterface from './components/ChatInterface';
 import TrainingInterface from './components/TrainingInterface';
 
-// NEW: Import our enhanced training center
+// Enhanced Upload Center component
 import EnhancedUploadCenter from './components/TrainingCenter/Enhanced/EnhancedUploadCenter';
-
-{trainingMode === 'enhanced' && (
-  <Box>
-    <TrainingStatus />  {/* Add this line */}
-    <EnhancedUploadCenter />
-  </Box>
-)}
 
 const categories = [
   { id: 'restaurants', name: 'RESTAURANTS', description: 'Background music, zone control, dining atmosphere', color: '#4CAF50' },
@@ -53,7 +37,7 @@ const categories = [
 function App() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [showTraining, setShowTraining] = useState(false);
-  const [trainingMode, setTrainingMode] = useState('standard'); // NEW: Track training mode
+  const [trainingMode, setTrainingMode] = useState('standard');
 
   const handleCategorySelect = (category) => {
     setSelectedCategory(category);
