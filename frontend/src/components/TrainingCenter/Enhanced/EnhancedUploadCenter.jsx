@@ -1,190 +1,316 @@
-// frontend/src/components/TrainingCenter/Enhanced/EnhancedUploadCenter.jsx (UPDATE)
+Copy// frontend/src/components/TrainingCenter/Enhanced/EnhancedUploadCenter.jsx (CORRECTED)
 import React, { useState } from 'react';
 import {
   Box,
-  Typography,
   Paper,
+  Typography,
   Button,
-  Alert,
   LinearProgress,
+  Alert,
+  Card,
+  CardContent,
+  Grid,
+  Chip,
+  List,
+  ListItem,
+  ListItemText,
+  Divider,
   CircularProgress
 } from '@mui/material';
-import { CloudUpload, Psychology, CheckCircle } from '@mui/icons-material';
+import {
+  CloudUpload,
+  CheckCircle,
+  AutoAwesome,
+  Business,
+  Inventory
+} from '@mui/icons-material';
 
 const EnhancedUploadCenter = () => {
+  const [uploadFile, setUploadFile] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState(null);
+  const [uploadResult, setUploadResult] = useState(null);
   const [error, setError] = useState(null);
 
-  const handleFileUpload = async (event) => {
+  const handleFileSelect = (event) => {
     const file = event.target.files[0];
-    if (!file) return;
+    if (file) {
+      if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        setUploadFile(file);
+        setError(null);
+        setUploadResult(null);
+      } else {
+        setError('Please select an Excel file (.xlsx or .xls)');
+        setUploadFile(null);
+      }
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!uploadFile) return;
 
     setUploading(true);
     setError(null);
-    setAnalysisResult(null);
 
     try {
-      // Use our real enhanced API endpoint
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', uploadFile);
 
-      const response = await fetch('http://localhost:8000/training-center/enhanced/upload/advanced', {
+      console.log('🚀 Uploading to:', '/api/v1/training-center/enhanced/upload/advanced');
+      
+      // CORRECTED: Use the exact path your backend expects
+      const response = await fetch('/api/v1/training-center/enhanced/upload/advanced', {
         method: 'POST',
         body: formData,
       });
 
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response ok:', response.ok);
+
       if (!response.ok) {
-        throw new Error(`Upload failed: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error('❌ Upload failed:', response.status, errorText);
+        setError(`Upload failed: ${response.status} - ${errorText}`);
+        return;
       }
 
       const result = await response.json();
-      setAnalysisResult(result);
-      
-      // Show success popup
-      alert(`🎉 SUCCESS! 
-File: ${file.name}
-Brands Detected: ${result.preview_data?.brands_detected?.length || 0}
-Products Found: ${result.preview_data?.total_products || 0}
-Analysis: ${result.preview_data?.structure_analysis?.analysis_method || 'Unknown'}
-Ready to Process: ${result.processing_ready ? 'YES' : 'NO'}`);
+      console.log('✅ Upload result:', result);
 
+      if (result.status === 'analysis_complete') {
+        setUploadResult(result);
+      } else {
+        setError(result.detail || result.message || 'Upload failed');
+      }
     } catch (err) {
-      console.error('Upload error:', err);
-      setError(err.message);
-      alert(`❌ Upload Error: ${err.message}`);
+      console.error('💥 Upload error:', err);
+      setError(`Upload error: ${err.message}`);
     } finally {
       setUploading(false);
     }
   };
 
+  const resetUpload = () => {
+    setUploadFile(null);
+    setUploadResult(null);
+    setError(null);
+    setUploading(false);
+  };
+
   return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', p: 3 }}>
-      {/* Header */}
-      <Paper sx={{ p: 4, mb: 3, textAlign: 'center', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
-        <Psychology sx={{ fontSize: 64, mb: 2 }} />
-        <Typography variant="h3" gutterBottom>
-          🤖 Enhanced AI Training Center
-        </Typography>
-        <Typography variant="h6">
-          Powered by GPT-4 Intelligence & Smart Detection
-        </Typography>
-      </Paper>
+    <Box>
+      {/* Upload Section */}
+      <Paper sx={{ p: 4, mb: 3 }}>
+        <Box sx={{ textAlign: 'center', mb: 4 }}>
+          <AutoAwesome sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
+          <Typography variant="h4" gutterBottom>
+            🚀 Enhanced AI Training Center
+          </Typography>
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            Advanced pricelist processing with AI-powered brand detection
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Upload your Excel pricelists - supports Nology format and 50+ other layouts
+          </Typography>
+        </Box>
 
-      {/* Features Alert */}
-      <Alert severity="info" sx={{ mb: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          ✨ Enhanced Features Active
-        </Typography>
-        <Typography>
-          🧠 GPT-4 Analysis • ⚡ Smart Column Detection • 📊 Multi-Brand Support • 🔍 Real-time Validation
-        </Typography>
-      </Alert>
+        {/* File Upload Area */}
+        {!uploadResult && (
+          <Box>
+            <Box
+              sx={{
+                border: '2px dashed',
+                borderColor: uploadFile ? 'success.main' : 'grey.300',
+                borderRadius: 2,
+                p: 4,
+                textAlign: 'center',
+                backgroundColor: uploadFile ? 'success.50' : 'grey.50',
+                cursor: 'pointer',
+                transition: 'all 0.3s',
+                '&:hover': {
+                  borderColor: 'primary.main',
+                  backgroundColor: 'primary.50'
+                }
+              }}
+              onClick={() => document.getElementById('file-input').click()}
+            >
+              <input
+                id="file-input"
+                type="file"
+                accept=".xlsx,.xls"
+                style={{ display: 'none' }}
+                onChange={handleFileSelect}
+              />
+              
+              {uploadFile ? (
+                <Box>
+                  <CheckCircle sx={{ fontSize: 60, color: 'success.main', mb: 2 }} />
+                  <Typography variant="h6" gutterBottom>
+                    📄 {uploadFile.name}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {(uploadFile.size / 1024 / 1024).toFixed(2)} MB
+                  </Typography>
+                  <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center', gap: 2 }}>
+                    <Button
+                      variant="contained"
+                      onClick={handleUpload}
+                      disabled={uploading}
+                      startIcon={uploading ? <CircularProgress size={20} /> : <CloudUpload />}
+                    >
+                      {uploading ? 'Processing...' : 'Process Pricelist'}
+                    </Button>
+                    <Button variant="outlined" onClick={resetUpload}>
+                      Choose Different File
+                    </Button>
+                  </Box>
+                </Box>
+              ) : (
+                <Box>
+                  <CloudUpload sx={{ fontSize: 60, color: 'grey.400', mb: 2 }} />
+                  <Typography variant="h6" gutterBottom>
+                    Drop your Excel pricelist here or click to browse
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Supports: .xlsx, .xls files
+                  </Typography>
+                  <Button variant="contained" sx={{ mt: 2 }}>
+                    Select Pricelist File
+                  </Button>
+                </Box>
+              )}
+            </Box>
 
-      {/* Error Display */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          <Typography variant="h6">Upload Error</Typography>
-          {error}
-        </Alert>
-      )}
-
-      {/* Upload Zone */}
-      <Paper
-        sx={{
-          border: 2,
-          borderStyle: 'dashed',
-          borderColor: uploading ? 'warning.main' : 'primary.main',
-          p: 6,
-          textAlign: 'center',
-          cursor: uploading ? 'wait' : 'pointer',
-          transition: 'all 0.3s ease',
-          '&:hover': !uploading ? {
-            borderColor: 'primary.dark',
-            bgcolor: 'primary.light',
-            transform: 'scale(1.02)'
-          } : {}
-        }}
-        onClick={() => !uploading && document.getElementById('file-input').click()}
-      >
-        <input
-          id="file-input"
-          type="file"
-          accept=".xlsx,.csv"
-          onChange={handleFileUpload}
-          style={{ display: 'none' }}
-          disabled={uploading}
-        />
-        
-        {uploading ? (
-          <CircularProgress size={64} sx={{ mb: 2 }} />
-        ) : (
-          <CloudUpload sx={{ fontSize: 64, color: 'primary.main', mb: 2 }} />
-        )}
-        
-        <Typography variant="h5" gutterBottom>
-          {uploading ? 'Analyzing with GPT-4...' : 'Upload Supplier Pricelist'}
-        </Typography>
-        
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-          {uploading 
-            ? 'Using Smart Detection + GPT-4 Intelligence...' 
-            : 'Drag & drop your Excel or CSV file, or click to browse'
-          }
-        </Typography>
-
-        {!uploading && (
-          <Button
-            variant="contained"
-            size="large"
-            startIcon={<CloudUpload />}
-          >
-            Choose File
-          </Button>
-        )}
-
-        {uploading && (
-          <Box sx={{ mt: 2 }}>
-            <LinearProgress sx={{ mb: 1, height: 8, borderRadius: 4 }} />
-            <Typography variant="body2" color="text.secondary">
-              🤖 GPT-4 + Smart Detection analyzing your pricelist...
-            </Typography>
+            {uploading && (
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="body2" gutterBottom>
+                  🧠 AI is analyzing your pricelist structure...
+                </Typography>
+                <LinearProgress />
+              </Box>
+            )}
           </Box>
         )}
+
+        {/* Error Display */}
+        {error && (
+          <Alert severity="error" sx={{ mt: 3 }} onClose={() => setError(null)}>
+            <Typography variant="h6">Upload Failed</Typography>
+            {error}
+          </Alert>
+        )}
       </Paper>
 
-      {/* Results Display */}
-      {analysisResult && (
-        <Alert severity="success" sx={{ mt: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            <CheckCircle sx={{ mr: 1, verticalAlign: 'middle' }} />
-            Analysis Complete!
-          </Typography>
-          <Typography variant="body2" sx={{ mb: 1 }}>
-            <strong>Brands Found:</strong> {analysisResult.preview_data?.brands_detected?.length || 0}
-          </Typography>
-          <Typography variant="body2" sx={{ mb: 1 }}>
-            <strong>Products Detected:</strong> {analysisResult.preview_data?.total_products?.toLocaleString() || 0}
-          </Typography>
-          <Typography variant="body2" sx={{ mb: 1 }}>
-            <strong>Analysis Method:</strong> {analysisResult.preview_data?.structure_analysis?.analysis_method || 'Unknown'}
-          </Typography>
-          <Typography variant="body2" sx={{ mb: 1 }}>
-            <strong>Layout Type:</strong> {analysisResult.preview_data?.structure_analysis?.layout_type || 'Unknown'}
-          </Typography>
-          <Typography variant="body2">
-            <strong>Ready to Process:</strong> {analysisResult.processing_ready ? '✅ YES' : '❌ NO'}
-          </Typography>
-        </Alert>
-      )}
+      {/* Results Section */}
+      {uploadResult && (
+        <Paper sx={{ p: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
+            <CheckCircle sx={{ color: 'success.main', mr: 2, fontSize: 40 }} />
+            <Box>
+              <Typography variant="h5" gutterBottom>
+                ✅ Analysis Complete!
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                {uploadResult.message}
+              </Typography>
+            </Box>
+          </Box>
 
-      {/* Status */}
-      <Alert severity="success" sx={{ mt: 3 }}>
-        <Typography variant="h6">🚀 Enhanced AI Training Center Ready!</Typography>
-        <Typography>
-          Backend running on port 8000 • GPT-4 Integration Active • Smart Detection Enabled
-        </Typography>
-      </Alert>
+          {/* Analysis Summary */}
+          <Grid container spacing={3} sx={{ mb: 4 }}>
+            <Grid item xs={12} md={4}>
+              <Card sx={{ textAlign: 'center', p: 2 }}>
+                <Inventory sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+                <Typography variant="h4" color="primary">
+                  {uploadResult.preview_data?.total_products || 0}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Products Detected
+                </Typography>
+              </Card>
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
+              <Card sx={{ textAlign: 'center', p: 2 }}>
+                <Business sx={{ fontSize: 40, color: 'secondary.main', mb: 1 }} />
+                <Typography variant="h4" color="secondary">
+                  {uploadResult.preview_data?.brands_detected?.length || 0}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Brands Found
+                </Typography>
+              </Card>
+            </Grid>
+            
+            <Grid item xs={12} md={4}>
+              <Card sx={{ textAlign: 'center', p: 2 }}>
+                <AutoAwesome sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
+                <Typography variant="h4" color="success.main">
+                  {uploadResult.preview_data?.extraction_summary?.success_rate || 0}%
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Success Rate
+                </Typography>
+              </Card>
+            </Grid>
+          </Grid>
+
+          {/* Brands Detected */}
+          {uploadResult.preview_data?.brands_detected?.length > 0 && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                🏷️ Brands Detected:
+              </Typography>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                {uploadResult.preview_data.brands_detected.map((brand, index) => (
+                  <Chip
+                    key={index}
+                    label={brand}
+                    color="primary"
+                    variant="outlined"
+                  />
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* Sample Products */}
+          {uploadResult.preview_data?.sample_products?.length > 0 && (
+            <Box sx={{ mb: 3 }}>
+              <Typography variant="h6" gutterBottom>
+                📦 Sample Products Extracted:
+              </Typography>
+              <List>
+                {uploadResult.preview_data.sample_products.slice(0, 5).map((product, index) => (
+                  <React.Fragment key={index}>
+                    <ListItem>
+                      <ListItemText
+                        primary={`${product.brand} - ${product.stock_code}`}
+                        secondary={
+                          product.price_excl_vat 
+                            ? `R${product.price_excl_vat} (excl. VAT)`
+                            : 'Price on request'
+                        }
+                      />
+                    </ListItem>
+                    {index < uploadResult.preview_data.sample_products.slice(0, 5).length - 1 && <Divider />}
+                  </React.Fragment>
+                ))}
+              </List>
+            </Box>
+          )}
+
+          {/* Action Buttons */}
+          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+            <Button
+              variant="contained"
+              size="large"
+              onClick={resetUpload}
+            >
+              Process Another Pricelist
+            </Button>
+          </Box>
+        </Paper>
+      )}
     </Box>
   );
 };
