@@ -30,7 +30,7 @@ const EnhancedUploadCenter = () => {
       formData.append('supplier_name', 'Nology');
 
       // *** CORRECTED: Use the actual backend API endpoint ***
-      const response = await fetch('http://localhost:8000/api/v1/training-center/advanced-upload', {
+      const response = await fetch('/api/v1/training-center/enhanced/upload/advanced', {
         method: 'POST',
         body: formData,
       });

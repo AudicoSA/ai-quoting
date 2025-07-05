@@ -367,13 +367,13 @@ async def enhanced_ai_chat_endpoint(chat_data: ChatMessage):
 # 🧠 ENHANCED AI TRAINING CENTER - YOUR REQUESTED FUNCTIONALITY
 # =============================================================================
 
-@app.post("/api/v1/training-center/advanced-upload")
-async def training_center_advanced_upload(
-    file: UploadFile = File(...),
-    supplier_name: Optional[str] = Form(None),
-    background_tasks: BackgroundTasks = None
-):
-    """🚀 AI Training Center Advanced Upload - Handles your 40+ pricelist formats"""
+# @app.post("/api/v1/training-center/advanced-upload")
+# async def training_center_advanced_upload(
+#   file: UploadFile = File(...),
+#    supplier_name: Optional[str] = Form(None),
+#    background_tasks: BackgroundTasks = None
+# ):
+#    """🚀 AI Training Center Advanced Upload - Handles your 40+ pricelist formats"""
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="Only Excel files (.xlsx, .xls) are supported")
     
