@@ -1,45 +1,91 @@
-# General files
-*.log
-.DS_Store
-.env
-.vscode/
-.idea/
-
-# Python (FastAPI Backend)
+# Dependencies
+node_modules/
 __pycache__/
-*.py[cod]
-*.egg-info/
-dist/
-build/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
 venv/
+.env
 .venv/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+audico_ai.db
+
+# Docker volumes and data
+postgres_data/
+chromadb_data/
+.docker/
+
+# Build outputs
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-.env
 
-# React (Frontend)
-node_modules/
-build/
-dist/
-.next/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-coverage/
-
-# Database
-*.sqlite3
-*.db
-*.db-journal
-data/
-migrations/
-
-# SQLantern specific files
-sqlantern.json
-sqlantern.sqlite
-
-# Miscellaneous
+# IDE files
+.vscode/
+.idea/
 *.swp
 *.swo
+*~
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Upload directories
+uploads/
+temp_uploads/
+static/uploads/
+
+# AI/ML model cache
+.cache/
+models/
+embeddings/
+vector_store/
+
+# Sensitive files
+config/secrets.json
+*.key
+*.pem
+*.p12
+certificates/
+
+# Large files that shouldn't be in git
+*.xlsx
+*.xls  
+*.pdf
+# Exception: keep sample files for testing
+!sample_files/*.xlsx
+!sample_files/*.pdf
+
+# Docker build cache
+.dockerignore
